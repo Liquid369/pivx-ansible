@@ -1,0 +1,30 @@
+---
+# playbooks/bootstrap.yml
+# Common OS preparation for every host in the fleet.
+# Safe to run repeatedly.
+
+- name: Bootstrap all hosts
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify Ansible version
+      ansible.builtin.assert:
+        that: ansible_version.full is version_compare('2.14', '>=')
+        msg: "Ansible 2.14+ required. Found {{ ansible_version.full }}"
+
+    - name: Verify OS is Ubuntu 22.04
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version == "22.04"
+        msg: "Ubuntu 22.04 required on {{ inventory_hostname }}"
+
+  roles:
+    - common
+
+  post_tasks:
+    - name: Show bootstrap complete message
+      ansible.builtin.debug:
+        msg: "Bootstrap complete on {{ inventory_hostname }} ({{ host_label }})"

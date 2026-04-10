@@ -1,0 +1,32 @@
+---
+# roles/pivx_install/defaults/main.yml
+# Default values for the pivx_install role.
+# Override in group_vars, host_vars, or playbook vars as needed.
+
+# Binary version — should be set in group_vars/all/main.yml
+pivx_version: "5.6.1"
+
+# Versioned install layout:
+#   /opt/pivx/releases/<version>/   ← immutable install per version
+#   /opt/pivx/current               ← symlink to active version
+#   /opt/pivx/current/bin/pivxd     ← what systemd units reference
+pivx_releases_base: "/opt/pivx/releases"
+pivx_install_dir: "{{ pivx_releases_base }}/{{ pivx_version }}"
+pivx_bin_dir: "{{ pivx_install_dir }}/bin"
+pivx_current_link: "/opt/pivx/current"
+pivx_symlink_dir: "/usr/local/bin"
+
+# PIVX system user
+pivx_user: pivx
+pivx_group: pivx
+
+# Sapling parameters path
+pivx_params_dir: "/home/{{ pivx_user }}/.pivx-params"
+
+# Whether to update the /opt/pivx/current symlink during this run.
+# Set false if you want to install a version without activating it.
+pivx_set_current: true
+
+# Whether to restart running instances after a binary upgrade.
+# Set false for staged upgrades where you control restarts manually.
+pivx_restart_on_upgrade: true

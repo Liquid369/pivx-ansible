@@ -1,0 +1,104 @@
+---
+# playbooks/lifecycle/enable_staking.yml
+#
+# Enables staking on nodes that have staking_enabled=true in their host_vars.
+#
+# WHEN TO RUN: Phase 3 (staking) — after lifecycle_phase=staking in group_vars.
+#
+# PREREQUISITES:
+#   - Nodes must have coins in their wallets (from mining rewards or transfers)
+#   - Wallets must be unlocked for staking (passphrase either empty or set)
+#   - lifecycle_phase=staking in group_vars/all/main.yml
+#   - make deploy-pivx has been run with staking_enabled=true per instance
+#
+# Usage:
+#   make enable-staking
+#   ansible-playbook -i ansible/inventories/testnet6 ansible/playbooks/lifecycle/enable_staking.yml
+
+- name: "PHASE 3 — Enable staking on configured instances"
+  hosts: "{{ target_hosts | default('masternodes:seeders') }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Gather staking-enabled instances
+      ansible.builtin.set_fact:
+        staking_instances: >-
+          {{ pivx_instances | selectattr('enabled', 'equalto', true)
+                            | selectattr('staking_enabled', 'defined')
+                            | selectattr('staking_enabled', 'equalto', true)
+                            | list }}
+
+    - name: Skip hosts with no staking instances
+      ansible.builtin.meta: end_host
+      when: staking_instances | length == 0
+
+    - name: Check wallet balance on staking instances
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getbalance"
+      loop: "{{ staking_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: balance_check
+      changed_when: false
+      failed_when: false
+
+    - name: Show balances
+      ansible.builtin.debug:
+        msg: "[{{ item.item.name }}] Balance: {{ item.stdout | trim | default('N/A') }} PIVX"
+      loop: "{{ balance_check.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Check staking status (confirm staking=1 is active)
+      # NOTE: pivxd starts staking automatically when staking=1 is in pivx.conf
+      # and the wallet is unlocked. If the wallet has a passphrase, the operator
+      # must unlock it BEFORE running this playbook:
+      #   pivx-cli -conf=... walletpassphrase "<passphrase>" 0 true
+      # The '0' timeout means "until daemon restarts"; 'true' = staking only.
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getstakingstatus"
+      loop: "{{ staking_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: staking_status
+      changed_when: false
+      failed_when: false
+
+    - name: Show staking status
+      ansible.builtin.debug:
+        msg: "[{{ item.item.name }}] staking status: {{ item.stdout | default('RPC error — check instance') }}"
+      loop: "{{ staking_status.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+- name: Post-enable staking instructions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Next steps
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Staking enablement complete.
+
+          Staking requires:
+            - staking=1 in pivx.conf (controlled by staking_enabled in host_vars)
+            - Coins in the wallet with >= {{ staking_min_confirmations }} confirmations
+            - Wallet unlocked (no passphrase, or unlocked for staking)
+
+          Monitor staking:
+            pivx-cli -conf=/etc/pivx/<instance>/pivx.conf getstakingstatus
+            pivx-cli -conf=/etc/pivx/<instance>/pivx.conf getwalletinfo
+
+          When staking is confirmed active:
+            - Proceed to Phase 4: make enable-masternodes
+          ============================================================

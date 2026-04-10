@@ -1,0 +1,7 @@
+---
+# roles/grafana/handlers/main.yml
+
+- name: restart grafana
+  ansible.builtin.service:
+    name: grafana-server
+    state: restarted

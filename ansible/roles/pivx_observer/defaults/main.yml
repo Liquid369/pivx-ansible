@@ -1,0 +1,10 @@
+---
+# roles/pivx_observer/defaults/main.yml
+
+# Observer node: txindex + addressindex enabled for full RPC visibility
+observer_txindex: 1
+observer_addressindex: 1
+
+# Whether to expose RPC to a monitoring-only IP (localhost by default)
+observer_rpc_allow_monitoring_host: false
+observer_rpc_monitoring_ip: "{{ hostvars[monitoring_host]['ansible_host'] | default('') }}"

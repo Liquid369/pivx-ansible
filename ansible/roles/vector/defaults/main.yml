@@ -1,0 +1,19 @@
+---
+# roles/vector/defaults/main.yml
+
+vector_version: "0.36.0"
+
+# Loki endpoint to ship logs to (should point to tn6-infra01 or monitoring host)
+# Override with loki_endpoint in group_vars/all/main.yml
+vector_loki_endpoint: "http://{{ loki_host | default('localhost') }}:3100"
+
+# How many parallel write requests to Loki
+vector_loki_request_concurrency: 10
+
+# Batch size before flushing to Loki
+vector_loki_batch_size: 102400    # 100KiB
+vector_loki_batch_timeout_secs: 5
+
+# Extra static labels added to all Vector Loki streams.
+# The pivx_provider, pivx_role, lifecycle_phase vars come from host_vars/group_vars.
+vector_extra_labels: {}

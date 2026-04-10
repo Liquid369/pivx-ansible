@@ -1,0 +1,53 @@
+---
+# roles/pivx_bootstrap_miner/tasks/stop_mining.yml
+#
+# Stops CPU mining on all mining-enabled instances via RPC.
+# Called from playbooks/lifecycle/stop_bootstrap_mining.yml.
+#
+# Note: This stops mining at runtime only.
+# To permanently disable mining, set lifecycle_phase=pos_transition in
+# group_vars/all/main.yml and re-run `make deploy-pivx`.
+# That will regenerate pivx.conf with gen=0 and restart instances.
+
+- name: Gather mining-enabled instances on this host
+  ansible.builtin.set_fact:
+    mining_instances: >-
+      {{ pivx_instances | selectattr('enabled', 'equalto', true)
+                        | selectattr('mining_enabled', 'defined')
+                        | selectattr('mining_enabled', 'equalto', true)
+                        | list }}
+
+- name: Stop CPU mining on each instance
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "setgenerate"
+      - "false"
+  loop: "{{ mining_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: stopgen_result
+  changed_when: true
+  failed_when: stopgen_result.rc != 0
+
+- name: Confirm mining stopped
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "getmininginfo"
+  loop: "{{ mining_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: mininginfo_result
+  changed_when: false
+
+- name: Show final mining status
+  ansible.builtin.debug:
+    msg: "[{{ item.item.name }}] mininginfo after stop: {{ item.stdout }}"
+  loop: "{{ mininginfo_result.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"

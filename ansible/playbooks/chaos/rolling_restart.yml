@@ -1,0 +1,24 @@
+---
+# playbooks/chaos/rolling_restart.yml
+# Rolling restart of all masternode instances, 3 hosts at a time.
+# This mimics a deployment restart without a full outage.
+
+- name: Rolling restart of all masternode instances
+  hosts: masternodes
+  become: true
+  gather_facts: false
+  serial: 3
+
+  tasks:
+    - name: Restart all PIVX instances on this host
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: restarted
+      loop: "{{ pivx_instances }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Wait 30s for instances to recover before moving to next batch
+      ansible.builtin.pause:
+        seconds: 30

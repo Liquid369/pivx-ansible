@@ -1,0 +1,86 @@
+---
+# examples/example_masternode_host.yml
+#
+# Example host_vars file for a Contabo or OVH host running 3 masternode instances
+# (one per protocol cohort: IPv4, IPv6, Tor).
+#
+# Copy this to host_vars/<hostname>.yml and replace all REPLACE_ME values.
+
+ansible_host: "203.0.113.10"        # REPLACE: actual VPS IP
+ansible_user: root
+ansible_python_interpreter: /usr/bin/python3
+
+# Provider label used in monitoring and log labels
+pivx_provider: contabo              # contabo | ovh
+pivx_role: masternode
+
+pivx_instances:
+
+  # --- IPv4 masternode ---
+  - name: tn6-cb1-v4-mn01
+    enabled: true
+    slot: 0
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "0.0.0.0"
+    external_ip: "203.0.113.10"     # REPLACE: actual IPv4 address
+    p2p_port: 51474
+    rpc_port: 51478
+    rpc_user: pivxrpc
+    rpc_password: "REPLACE_ME"      # generate: python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+    datadir: "/var/lib/pivx/tn6-cb1-v4-mn01"
+    logdir: "/var/log/pivx/tn6-cb1-v4-mn01"
+    confdir: "/etc/pivx/tn6-cb1-v4-mn01"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false           # set true AFTER ProRegTx confirmed
+    bls_operator_key: "REPLACE_ME"     # generate: pivx-cli bls generate → use .secret
+    extra_conf: ""
+
+  # --- IPv6 masternode ---
+  - name: tn6-cb1-v6-mn02
+    enabled: true
+    slot: 1
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "::"
+    external_ip: "2001:db8::10"     # REPLACE: actual IPv6 address
+    p2p_port: 51484
+    rpc_port: 51488
+    rpc_user: pivxrpc
+    rpc_password: "REPLACE_ME"
+    datadir: "/var/lib/pivx/tn6-cb1-v6-mn02"
+    logdir: "/var/log/pivx/tn6-cb1-v6-mn02"
+    confdir: "/etc/pivx/tn6-cb1-v6-mn02"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: ""
+
+  # --- Tor hidden service masternode ---
+  - name: tn6-cb1-tor-mn03
+    enabled: true
+    slot: 2
+    protocol_class: tor
+    cohort: tor
+    role: masternode
+    bind_addr: "127.0.0.1"
+    external_ip: ""                 # not used for Tor — onion_address used instead
+    p2p_port: 51494
+    rpc_port: 51498
+    rpc_user: pivxrpc
+    rpc_password: "REPLACE_ME"
+    datadir: "/var/lib/pivx/tn6-cb1-tor-mn03"
+    logdir: "/var/log/pivx/tn6-cb1-tor-mn03"
+    confdir: "/etc/pivx/tn6-cb1-tor-mn03"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: "REPLACE_ME"
+    # Tor-specific: populated after first `make deploy-tor` run
+    onion_address: "REPLACE_AFTER_DEPLOY.onion"
+    onion_service_dir: "/var/lib/tor/tn6-cb1-tor-mn03"
+    extra_conf: ""

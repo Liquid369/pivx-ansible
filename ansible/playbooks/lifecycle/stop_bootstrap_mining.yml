@@ -1,0 +1,66 @@
+---
+# playbooks/lifecycle/stop_bootstrap_mining.yml
+#
+# Stops CPU mining on all bootstrap_miner hosts via RPC.
+#
+# NOTE: This stops mining at RUNTIME only.
+# To permanently disable mining: set lifecycle_phase=pos_transition in
+# group_vars/all/main.yml, then run `make deploy-pivx`.
+# That regenerates pivx.conf with gen=0 and restarts instances.
+#
+# Usage:
+#   make stop-bootstrap-mining
+#   ansible-playbook -i ansible/inventories/testnet6 ansible/playbooks/lifecycle/stop_bootstrap_mining.yml
+
+- name: "PHASE 2→3 — Stop bootstrap mining (runtime)"
+  hosts: bootstrap_miners
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Stop mining via RPC on each instance
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../../roles/pivx_bootstrap_miner/tasks/stop_mining.yml"
+
+    - name: Report final block heights
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getblockcount"
+      loop: "{{ pivx_instances | selectattr('enabled', 'equalto', true) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: heights
+      changed_when: false
+      failed_when: false
+
+    - name: Display final heights
+      ansible.builtin.debug:
+        msg: "[{{ item.item.name }}] Final block height: {{ item.stdout | trim | default('N/A') }}"
+      loop: "{{ heights.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+- name: Post-stop instructions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Next steps
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Mining stopped on all bootstrap miners.
+
+          Runtime mining is stopped. pivxd instances are still running.
+
+          TO MAKE THIS PERMANENT:
+          1. Edit group_vars/all/main.yml:
+               lifecycle_phase: pos_transition
+          2. Run: make deploy-pivx
+             (this regenerates pivx.conf with gen=0 and restarts instances)
+
+          THEN continue with:
+            make transition-to-pos
+          ============================================================

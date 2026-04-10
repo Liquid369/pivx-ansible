@@ -1,0 +1,25 @@
+# group_vars/bootstrap_miners.yml
+# Applied to all hosts in the `bootstrap_miners` inventory group.
+# These are the nodes that mine blocks during Phase 2 to bootstrap the chain.
+#
+# PIVX testnet uses PoW (Proof of Work) for the initial block period until
+# the staking activation height (nFirstPoSBlock in chainparams.cpp) is reached.
+# After that point, the network transitions to PoS consensus.
+#
+# Note: Additional per-host mining config (mining address) must be set in
+# each host's host_vars (bootstrap_mining_address field).
+
+# Override: these nodes have mining enabled by default at the group level.
+# Individual instances override this with their mining_enabled flag.
+bootstrap_mining_enabled: true
+
+# Mining threads — keep low on testnet (1-2 is plenty for low-difficulty early blocks)
+bootstrap_mining_threads: 1
+
+# Extra pivx.conf lines applied to all miner instances during Phase 2
+miner_extra_conf:
+  - "gen=1"                          # enable mining
+  - "genproclimit={{ bootstrap_mining_threads }}"
+
+# Once this host transitions past Phase 2, these lines are removed by
+# the transition_to_pos playbook (which re-renders pivx.conf with mining disabled).

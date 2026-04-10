@@ -1,0 +1,90 @@
+---
+# roles/pivx_bootstrap_miner/tasks/main.yml
+#
+# Activates CPU mining on all mining-enabled PIVX instances on this host.
+#
+# PIVX testnet bootstrap mining:
+#   - The testnet begins at block 0 with PoW consensus.
+#   - Mining runs until nFirstPoSBlock (testnet param, ~201 by default).
+#   - After that height, the chain can accept PoS blocks. Mining can stop.
+#
+# This role is called from playbooks/lifecycle/start_bootstrap_mining.yml.
+# It uses the PIVX RPC `setgenerate` command to start/stop CPU mining.
+#
+# Assumptions:
+#   - pivxd instances are already running (pivx_instance role applied first)
+#   - pivx.conf already has gen=1 and miningaddress set (written by pivx_instance
+#     when mining_enabled=true and lifecycle_phase=bootstrap_mining)
+#   - This role's start/stop actions are via RPC, for runtime control only.
+#     The config-level mining toggle (gen=) is controlled by lifecycle_phase.
+
+- name: Gather mining-enabled instances on this host
+  ansible.builtin.set_fact:
+    mining_instances: >-
+      {{ pivx_instances | selectattr('enabled', 'equalto', true)
+                        | selectattr('mining_enabled', 'defined')
+                        | selectattr('mining_enabled', 'equalto', true)
+                        | list }}
+
+- name: Show mining instances found
+  ansible.builtin.debug:
+    msg: "Mining-enabled instances on {{ inventory_hostname }}: {{ mining_instances | map(attribute='name') | list }}"
+
+- name: Fail if no mining address set for mining instances
+  ansible.builtin.fail:
+    msg: >
+      Instance {{ item.name }} has mining_enabled=true but no bootstrap_mining_address is set.
+      Set bootstrap_mining_address in host_vars/{{ inventory_hostname }}.yml
+  loop: "{{ mining_instances }}"
+  when: >
+    (item.bootstrap_mining_address | default(bootstrap_mining_address) | default('')) in ['', 'REPLACE_ME']
+
+# ---------------------------------------------------------------------------
+# Start mining via RPC
+# ---------------------------------------------------------------------------
+- name: Start CPU mining on each mining-enabled instance
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "setgenerate"
+      - "true"
+      - "{{ item.bootstrap_mining_threads | default(bootstrap_mining_threads) | string }}"
+  loop: "{{ mining_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: setgen_result
+  changed_when: true   # RPC calls are always "changed" conceptually
+  failed_when: setgen_result.rc != 0
+
+- name: Show setgenerate results
+  ansible.builtin.debug:
+    msg: "[{{ item.item.name }}] setgenerate: {{ item.stdout | default('ok') }}"
+  loop: "{{ setgen_result.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+# ---------------------------------------------------------------------------
+# Verify mining is active (check mininginfo)
+# ---------------------------------------------------------------------------
+- name: Check mininginfo for each running miner
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "getmininginfo"
+  loop: "{{ mining_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: mininginfo_result
+  changed_when: false
+  failed_when: false
+
+- name: Show mining status
+  ansible.builtin.debug:
+    msg: "[{{ item.item.name }}] mininginfo: {{ item.stdout }}"
+  loop: "{{ mininginfo_result.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"

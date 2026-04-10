@@ -1,0 +1,126 @@
+---
+# playbooks/lifecycle/enable_masternodes.yml
+#
+# Activates masternode behavior on instances that have masternode_enabled=true.
+#
+# WHEN TO RUN: Phase 4 — after DMN registration on-chain is complete.
+#
+# PREREQUISITES (must ALL be done before this playbook):
+#   1. Chain is synced across all nodes (verify with make verify-readiness)
+#   2. DMN collateral transactions are confirmed on-chain
+#      (10000 PIVX testnet collateral per masternode)
+#   3. BLS operator keypairs generated and bls_operator_key filled in host_vars
+#   4. ProRegTx broadcast for each DMN (done outside Ansible via PIVX Core wallet)
+#   5. host_vars updated: masternode_enabled: true per instance
+#   6. group_vars/all/main.yml: lifecycle_phase: masternode_quorum
+#   7. make deploy-pivx run to regenerate pivx.conf with masternode=1
+#
+# This playbook only VERIFIES masternode status is active — it does not
+# register masternodes. DMN registration is an on-chain wallet operation.
+#
+# Usage:
+#   make enable-masternodes
+#   ansible-playbook -i ansible/inventories/testnet6 ansible/playbooks/lifecycle/enable_masternodes.yml
+
+- name: "PHASE 4 — Verify masternode activation"
+  hosts: masternodes
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Gather masternode-enabled instances
+      ansible.builtin.set_fact:
+        mn_instances: >-
+          {{ pivx_instances | selectattr('enabled', 'equalto', true)
+                            | selectattr('masternode_enabled', 'defined')
+                            | selectattr('masternode_enabled', 'equalto', true)
+                            | list }}
+
+    - name: Skip hosts with no masternode instances
+      ansible.builtin.meta: end_host
+      when: mn_instances | length == 0
+
+    - name: Check masternode status via RPC
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "masternode"
+          - "status"
+      loop: "{{ mn_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: mn_status
+      changed_when: false
+      failed_when: false
+
+    - name: Show masternode status
+      ansible.builtin.debug:
+        msg: |
+          [{{ item.item.name }}] masternode status:
+          {{ item.stdout | default(item.stderr) | default('No output') }}
+      loop: "{{ mn_status.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Check active LLMQ quorums
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "quorum"
+          - "list"
+      loop: "{{ mn_instances | unique(attribute='confdir') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: quorum_list
+      changed_when: false
+      failed_when: false
+
+    - name: Show quorum list
+      ansible.builtin.debug:
+        msg: "[{{ item.item.name }}] quorums: {{ item.stdout | default('N/A') }}"
+      loop: "{{ quorum_list.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Warn about missing BLS keys
+      ansible.builtin.debug:
+        msg: >
+          WARNING: Instance {{ item.name }} has masternode_enabled=true
+          but bls_operator_key is not set or is REPLACE_ME.
+          Generate: pivx-cli bls generate
+          Then fill bls_operator_key in host_vars/{{ inventory_hostname }}.yml
+      loop: "{{ mn_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.bls_operator_key | default('') in ['', 'REPLACE_ME']
+
+- name: Post-activation instructions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Next steps
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Masternode activation check complete.
+
+          If masternodes show status READY/ENABLED, you are in Phase 4.
+
+          NEXT:
+          - Monitor quorum DKG: check Grafana dashboards
+          - Run chaos tests: make chaos-inject-latency COHORT=tor LATENCY_MS=200
+          - Collect quorum logs: make collect-debug
+
+          QUORUM READINESS CHECK:
+            pivx-cli quorum dkgstatus
+            pivx-cli quorum info <llmq_type> <quorum_hash>
+
+          DMN REGISTRATION (outside Ansible):
+            This must be done in PIVX Core wallet with:
+              protx register_prepare ... / sign / submit
+            See: docs/LIFECYCLE.md#phase-4-masternode-quorum-testing
+          ============================================================

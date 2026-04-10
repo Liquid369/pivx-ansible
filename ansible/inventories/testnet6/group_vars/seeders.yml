@@ -1,0 +1,18 @@
+# group_vars/seeders.yml
+# Applies to seed/bootstrap nodes only.
+
+node_role: seeder
+
+# Seeders run a single IPv4 instance + optional IPv6 listener.
+# They do NOT run as masternodes.
+pivx_instances_expected: 1
+
+# Allow many inbound connections - seeders are connection targets
+pivx_extra_conf:
+  - "listen=1"
+  - "maxconnections=256"
+  - "dnsseed=0"
+  - "listenonion=0"
+
+ufw_pivx_ports:
+  - "{{ pivx_p2p_port_base }}"

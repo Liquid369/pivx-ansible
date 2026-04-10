@@ -1,0 +1,45 @@
+---
+# playbooks/ops/show_status.yml
+# Quick fleet status check — shows instance states and blockchain heights.
+
+- name: Show fleet status
+  hosts: masternodes:seeders:observers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check systemd status of all PIVX instances
+      ansible.builtin.command: >
+        systemctl is-active pivxd@{{ item.name }}.service
+      loop: "{{ pivx_instances }}"
+      when: item.enabled | default(true)
+      register: svc_status
+      changed_when: false
+      failed_when: false
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Get block height for each active instance
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_symlink_dir }}/pivx-cli"
+          - "-conf={{ item.item.confdir }}/pivx.conf"
+          - "-datadir={{ item.item.datadir }}"
+          - "getblockcount"
+      loop: "{{ svc_status.results }}"
+      when: item.stdout == 'active'
+      register: blockheights
+      changed_when: false
+      failed_when: false
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Show instance summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.item.item.name }}
+          status={{ item.item.stdout | default('unknown') }}
+          height={{ item.stdout | default('N/A') }}
+      loop: "{{ blockheights.results }}"
+      loop_control:
+        label: "{{ item.item.item.name }}"

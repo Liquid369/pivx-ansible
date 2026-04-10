@@ -1,0 +1,11 @@
+---
+# roles/blackbox_exporter/defaults/main.yml
+# Blackbox exporter probes TCP endpoints to verify PIVX P2P ports are reachable.
+
+blackbox_exporter_version: "0.24.0"
+blackbox_exporter_port: 9115
+blackbox_exporter_user: blackbox-exporter
+
+# Whether to auto-generate probe targets from the pivx_instances list.
+# Set false to manage scrape_configs in prometheus manually.
+blackbox_generate_targets: true

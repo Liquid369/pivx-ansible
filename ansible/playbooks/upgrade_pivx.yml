@@ -1,0 +1,68 @@
+---
+# playbooks/upgrade_pivx.yml
+# Rolling upgrade of the PIVX binary across the fleet.
+#
+# Usage:
+#   ansible-playbook -i inventories/testnet6 playbooks/upgrade_pivx.yml \
+#     -e "pivx_version=5.7.0 pivx_checksum=sha256:REPLACE_ME"
+#
+# The rolling serial ensures only a fraction of the fleet upgrades at once,
+# giving quorum enough remaining nodes to remain functional during the upgrade.
+
+- name: Rolling PIVX binary upgrade
+  hosts: masternodes:seeders:observers
+  become: true
+  gather_facts: true
+  serial: 3         # upgrade 3 hosts at a time (~25% of masternodes)
+  max_fail_percentage: 10
+
+  tasks:
+    - name: Assert pivx_version is set
+      ansible.builtin.assert:
+        that: pivx_version is defined and pivx_version != ''
+        msg: "Pass -e 'pivx_version=X.Y.Z' when running this playbook."
+
+    - name: Gracefully stop all PIVX instances on this host
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: stopped
+      loop: "{{ pivx_instances }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Install new PIVX version
+      ansible.builtin.include_role:
+        name: pivx_install
+
+    - name: Start all PIVX instances on this host
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: started
+      loop: "{{ pivx_instances }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Wait for RPC on primary instance to respond
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_symlink_dir }}/pivx-cli"
+          - "-conf={{ pivx_instances[0].confdir }}/pivx.conf"
+          - "-datadir={{ pivx_instances[0].datadir }}"
+          - "getblockchaininfo"
+      register: rpc_check
+      until: rpc_check.rc == 0
+      retries: 30
+      delay: 10
+      changed_when: false
+      check_mode: false
+
+    - name: Record upgrade in upgrade log
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/upgrade.log
+        line: "{{ ansible_date_time.iso8601 }} upgraded to {{ pivx_version }} on {{ inventory_hostname }}"
+        create: true
+        mode: "0640"
+        owner: "{{ pivx_user }}"
+        group: "{{ pivx_group }}"

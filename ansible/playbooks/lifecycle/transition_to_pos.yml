@@ -1,0 +1,130 @@
+---
+# playbooks/lifecycle/transition_to_pos.yml
+#
+# Executes the controlled transition from bootstrap mining (Phase 2)
+# to Proof-of-Stake consensus (Phase 3).
+#
+# WHEN TO RUN:
+#   - After chain height >= mining_phase_target_height
+#   - Verify with: make verify-readiness
+#
+# WHAT IT DOES:
+#   1. Verifies chain height is past the PoS activation threshold
+#   2. Stops mining (runtime)
+#   3. Sets lifecycle_phase NOTE: This playbook does NOT auto-edit group_vars.
+#      The operator must update lifecycle_phase manually (see post-tasks message).
+#   4. Re-renders pivx.conf with gen=0 for all instances on miner hosts
+#   5. Restarts affected instances
+#   6. Optionally enables staking on nodes that hold testnet coins
+#
+# PREREQUISITES:
+#   - Chain height >= mining_phase_target_height
+#   - Nodes should be synchronized
+#   - staking wallets (if using staking) should be unlocked/configured
+#
+# Usage:
+#   make transition-to-pos
+#   ansible-playbook -i ansible/inventories/testnet6 ansible/playbooks/lifecycle/transition_to_pos.yml
+
+- name: "PHASE 2→3 — Verify chain readiness"
+  hosts: bootstrap_miners
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Get current block height
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ (pivx_instances | selectattr('enabled', 'equalto', true) | first).confdir }}/pivx.conf"
+          - "-datadir={{ (pivx_instances | selectattr('enabled', 'equalto', true) | first).datadir }}"
+          - "getblockcount"
+      register: current_height
+      changed_when: false
+
+    - name: Check height is past PoS activation
+      ansible.builtin.fail:
+        msg: >
+          Chain height {{ current_height.stdout | trim }} is below
+          PoS activation threshold {{ mining_phase_target_height }}.
+          Continue mining and retry when height exceeds that value.
+          Check: make verify-readiness
+      when: (current_height.stdout | trim | int) < (mining_phase_target_height | int)
+
+    - name: Confirm height is ready
+      ansible.builtin.debug:
+        msg: >
+          ✓ Chain height {{ current_height.stdout | trim }} >=
+          threshold {{ mining_phase_target_height }} — proceeding.
+
+- name: "PHASE 2→3 — Stop mining on miner hosts"
+  hosts: bootstrap_miners
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Stop mining via RPC
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../../roles/pivx_bootstrap_miner/tasks/stop_mining.yml"
+
+- name: "PHASE 2→3 — Reconfigure miner instances (gen=0)"
+  hosts: bootstrap_miners
+  become: true
+  gather_facts: true
+
+  vars:
+    # Force lifecycle_phase override for this play only
+    # The operator still needs to update group_vars manually after this.
+    lifecycle_phase: pos_transition
+
+  tasks:
+    - name: Regenerate pivx.conf with mining disabled
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/pivx_instance/templates/pivx.conf.j2"
+        dest: "{{ item.confdir }}/pivx.conf"
+        owner: "{{ pivx_user }}"
+        group: "{{ pivx_group }}"
+        mode: "0640"
+      loop: "{{ pivx_instances | selectattr('enabled', 'equalto', true) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        instance: "{{ item }}"
+      register: conf_changed
+
+    - name: Restart instances where config changed
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.item.name }}.service"
+        state: restarted
+      loop: "{{ conf_changed.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.changed
+
+- name: "PHASE 2→3 — Post-transition instructions"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Print next steps
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Mining-to-PoS transition complete.
+
+          *** REQUIRED MANUAL STEP ***
+          Edit: group_vars/all/main.yml
+            lifecycle_phase: pos_transition   ← change to this
+          Then run: make deploy-pivx
+          (This permanently regenerates all pivx.conf files with gen=0)
+
+          NEXT PHASE STEPS:
+          1. Make sure test coins are in staking wallets on staking nodes
+          2. Edit host_vars for staking nodes: staking_enabled: true
+          3. Edit group_vars/all/main.yml: lifecycle_phase: staking
+          4. Run: make deploy-pivx
+          5. Run: make enable-staking
+          6. Monitor staking: make status
+
+          After confirmed staking:
+          7. Run: make enable-masternodes  (Phase 4)
+          ============================================================

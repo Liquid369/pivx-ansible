@@ -1,0 +1,161 @@
+# group_vars/all/main.yml
+# Global defaults for the entire Testnet6 fleet.
+# Override in child group_vars or host_vars as needed.
+#
+# LIFECYCLE PHASES — set lifecycle_phase at runtime or in group_vars:
+#   bootstrap_mining   Phase 2: fresh chain, designated miners running
+#   pos_transition     Phase 3: mining tapering off, staking being enabled
+#   staking            Phase 3b: PoS active, MN registration begins
+#   masternode_quorum  Phase 4: full quorum/LLMQ testing
+#   chaos_testing      Phase 5: active failure injection experiments
+
+# ---------------------------------------------------------------------------
+# Current lifecycle phase
+# This var is read by roles and templates to conditionally enable behavior.
+# Change it here (or override per-host/group) as the testnet advances.
+# ---------------------------------------------------------------------------
+lifecycle_phase: bootstrap_mining    # CHANGE as testnet progresses
+
+# ---------------------------------------------------------------------------
+# PIVX binary
+# Versioned install layout:
+#   /opt/pivx/releases/<version>/  — immutable per-version install
+#   /opt/pivx/current              — symlink to active version
+#   /opt/pivx/current/bin/pivxd    — what systemd units use
+# ---------------------------------------------------------------------------
+pivx_version: "5.6.1"
+pivx_releases_base: "/opt/pivx/releases"
+pivx_install_dir: "{{ pivx_releases_base }}/{{ pivx_version }}"
+pivx_bin_dir: "{{ pivx_install_dir }}/bin"
+pivx_current_link: "/opt/pivx/current"     # symlink → active release
+pivx_symlink_dir: "/usr/local/bin"          # individual binary symlinks
+pivx_archive_url: "https://github.com/PIVX-Project/PIVX/releases/download/v{{ pivx_version }}/pivx-{{ pivx_version }}-x86_64-linux-gnu.tar.gz"
+pivx_checksum: "sha256:REPLACE_ME"  # REPLACE: fetch from v5.6.1 sha256sums.txt on GitHub releases
+
+# ---------------------------------------------------------------------------
+# Sapling parameters
+# ---------------------------------------------------------------------------
+# PIVX requires Sapling zk-SNARK parameter files before pivxd will start.
+# These are downloaded once per host to pivx_params_dir.
+# The pivx_install role runs sapling-fetch-params as pivx_user automatically.
+pivx_params_dir: "/home/{{ pivx_user }}/.pivx-params"
+pivx_sapling_params:
+  - name: sapling-spend.params
+    url: "https://download.z.cash/downloads/sapling-spend.params"
+    checksum: "sha256:8e48ffd23abb3a5fd9c5589204f32d9c31285a04b78096ba40a79b75677efc13"
+  - name: sapling-output.params
+    url: "https://download.z.cash/downloads/sapling-output.params"
+    checksum: "sha256:2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4"
+  - name: sprout-groth16.params
+    url: "https://download.z.cash/downloads/sprout-groth16.params"
+    checksum: "sha256:b685d700c60328498fbde589c8c7c484c722b788b265b72af448a5bf0ee55b50"
+
+# ---------------------------------------------------------------------------
+# PIVX network / chain identity
+# ---------------------------------------------------------------------------
+pivx_network: testnet
+chain: testnet6
+pivx_conf_magic: "0x71c1c1c1"   # REPLACE_ME: use actual testnet6 network magic if custom
+
+# ---------------------------------------------------------------------------
+# Instance defaults — overridden per-instance in host_vars
+# ---------------------------------------------------------------------------
+pivx_user: pivx
+pivx_group: pivx
+pivx_base_datadir: /var/lib/pivx
+pivx_base_logdir: /var/log/pivx
+pivx_base_confdir: /etc/pivx
+
+# Port base values.  Each instance increments by its index to avoid conflicts.
+# Instance slot 0 = base ports; slot 1 = base+10; slot 2 = base+20
+pivx_p2p_port_base: 51474       # testnet p2p default
+pivx_rpc_port_base: 51478       # testnet rpc default
+
+# ---------------------------------------------------------------------------
+# Systemd
+# ---------------------------------------------------------------------------
+pivx_systemd_service_template: "pivxd@.service"
+
+# ---------------------------------------------------------------------------
+# Monitoring / observability
+# ---------------------------------------------------------------------------
+prometheus_scrape_interval: 30s
+node_exporter_port: 9100
+vector_port: 8686                # Vector API / metrics port
+
+# Monitoring host — the Prometheus/Grafana/Loki stack target
+monitoring_host: tn6-infra01
+loki_endpoint: "http://{{ hostvars['tn6-infra01']['ansible_host'] }}:3100"
+prometheus_remote_write_url: ""  # optional; leave blank for local only
+
+# ---------------------------------------------------------------------------
+# Tor
+# ---------------------------------------------------------------------------
+tor_user: debian-tor
+tor_hidden_service_base_dir: /var/lib/tor/pivx_hs
+tor_socks_port: 9050
+
+# ---------------------------------------------------------------------------
+# Bootstrap mining settings
+# Used by pivx_bootstrap_miner role and start_bootstrap_mining playbook.
+#
+# PIVX testnet starts with PoW mining until enough blocks accumulate for
+# PoS consensus and then masternode activation prerequisites are met.
+# ---------------------------------------------------------------------------
+bootstrap_mining_enabled: false           # set true on miner hosts during Phase 2
+bootstrap_mining_threads: 1               # CPU threads for testnet mining; low value is fine
+bootstrap_mining_address: "REPLACE_ME"   # REPLACE: testnet address that receives mined rewards
+                                          # Generate with: pivx-cli getnewaddress in testnet wallet
+# Target block height before Phase 3 staking transition begins.
+# PIVX testnet PoS activates at block N; confirm this with PIVX devs.
+# Chain parameter: nFirstPoSBlock in chainparams.cpp  (placeholder 201 for testnet)
+mining_phase_target_height: 201           # REPLACE if different in this testnet build
+
+# ---------------------------------------------------------------------------
+# Staking settings
+# Enabled during Phase 3 on nodes that hold testnet coins.
+# ---------------------------------------------------------------------------
+staking_enabled: false                    # set true per-host once transition begins
+staking_min_confirmations: 200            # minimum confirmations before a UTXO stakes
+
+# ---------------------------------------------------------------------------
+# Masternode / quorum settings
+# ---------------------------------------------------------------------------
+masternode_enabled: false                 # set true per-instance once MN reg is done
+# LLMQ type for testnet quorum (placeholder — confirm with PIVX devs)
+# llmq_type_1 = 50/60 for devnet/testnet in recent PIVX builds
+llmq_type: 1
+quorum_size: 10                           # placeholder; set to actual testnet quorum size
+
+# ---------------------------------------------------------------------------
+# Chain reset / wipe settings
+# Used by the wipe_chain playbook for complete testnet restarts.
+# ---------------------------------------------------------------------------
+chain_wipe_keep_wallet: true              # preserve wallet.dat across wipes
+chain_wipe_keep_tor_keys: true            # preserve Tor HS private keys across wipes
+
+# ---------------------------------------------------------------------------
+# Seed nodes
+# Add real addresses once seeds are known; placeholders shown.
+# Both v4 and onion seeds are supported.
+# ---------------------------------------------------------------------------
+pivx_seed_nodes:
+  - "203.0.113.31:51474"     # tn6-seed01 IPv4 — REPLACE
+  - "203.0.113.32:51474"     # tn6-seed02 IPv4 — REPLACE
+  # - "<seed01.onion>:51474" # Add Tor seeds once HS addresses are known
+
+# ---------------------------------------------------------------------------
+# Logging labels (common; instances add their own below)
+# ---------------------------------------------------------------------------
+log_labels:
+  chain: "{{ chain }}"
+  env: testnet6
+  lifecycle_phase: "{{ lifecycle_phase }}"
+
+# ---------------------------------------------------------------------------
+# Ops
+# ---------------------------------------------------------------------------
+debug_bundle_local_dir: "{{ playbook_dir }}/../../debug_bundles"
+
+# Minimum peers before considering an instance healthy
+min_peer_count: 2

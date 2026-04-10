@@ -1,0 +1,27 @@
+---
+# roles/tc_netem/defaults/main.yml
+# Defaults for the tc_netem role.
+# All values can be overridden via extra-vars when calling chaos playbooks.
+
+# Network interface to apply rules to.
+# "auto" = use the primary default-route interface (detected at runtime).
+# Override with a specific name like "eth0" if auto-detection fails.
+netem_interface: auto
+
+# Latency defaults
+netem_latency: "100ms"       # added delay
+netem_jitter: "10ms"         # random variation (jitter)
+netem_correlation: "25%"     # correlation between consecutive packets
+
+# Packet loss defaults
+netem_loss_percent: "5%"     # percentage of packets to drop
+netem_loss_correlation: "25%"
+
+# Whether to limit netem to specific ports (empty = all traffic on interface)
+# Useful to target only PIVX P2P traffic vs all traffic.
+netem_port_filter: []        # e.g. [51474, 51484, 51494]
+netem_use_port_filter: false
+
+# Parent qdisc handle
+netem_handle: "1:1"
+netem_parent: "root"

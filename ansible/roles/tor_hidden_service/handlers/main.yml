@@ -1,0 +1,7 @@
+---
+# roles/tor_hidden_service/handlers/main.yml
+
+- name: restart tor
+  ansible.builtin.service:
+    name: tor
+    state: restarted

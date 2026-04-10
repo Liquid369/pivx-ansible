@@ -1,0 +1,45 @@
+---
+# roles/pivx_instance/defaults/main.yml
+# Defaults for the pivx_instance role.
+# These are overridden per-instance from the `instance` dict passed in.
+
+# Binary location (uses /opt/pivx/current symlink by default)
+pivx_binary: "/opt/pivx/current/bin/pivxd"
+pivx_cli_binary: "/opt/pivx/current/bin/pivx-cli"
+
+# System user/group
+pivx_user: pivx
+pivx_group: pivx
+
+# Base directories (instance-specific paths come from the `instance` dict)
+pivx_base_datadir: /var/lib/pivx
+pivx_base_logdir: /var/log/pivx
+pivx_base_confdir: /etc/pivx
+
+# Port base values (slots offset by ×10)
+pivx_p2p_port_base: 51474
+pivx_rpc_port_base: 51478
+
+# ZMQ port base (optional; used if instance.zmq_enabled is true)
+pivx_zmq_port_base: 28332
+
+# How long to wait for RPC to become available after start (seconds)
+pivx_rpc_wait_retries: 30
+pivx_rpc_wait_delay: 10
+
+# Lifecycle phase (read from global group_vars; controls what goes in pivx.conf)
+lifecycle_phase: bootstrap_mining
+
+# Debug categories written to pivx.conf
+# Reduce/expand as needed during different test phases
+pivx_debug_categories:
+  - masternode
+  - llmq
+  - mnauth
+  - net
+
+# Maximum connections default
+pivx_maxconnections: 125
+
+# Whether to log to stdout (useful for journald capture)
+pivx_printtoconsole: 1

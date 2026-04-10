@@ -1,0 +1,41 @@
+---
+# examples/example_infra_host.yml
+#
+# Example host_vars for the infrastructure/monitoring host.
+# This host runs: Prometheus, Loki, Grafana, Alertmanager, and one observer PIVX instance.
+
+ansible_host: "203.0.113.50"       # REPLACE: actual infra host IP
+ansible_user: root
+ansible_python_interpreter: /usr/bin/python3
+
+pivx_provider: contabo
+pivx_role: observer
+
+# Single observer PIVX instance — full node with txindex/addressindex for querying
+pivx_instances:
+  - name: tn6-infra01-obs01
+    enabled: true
+    slot: 0
+    protocol_class: ipv4
+    cohort: ipv4
+    role: observer
+    bind_addr: "0.0.0.0"
+    external_ip: "203.0.113.50"    # REPLACE
+    p2p_port: 51474
+    rpc_port: 51478
+    rpc_user: pivxrpc
+    rpc_password: "REPLACE_ME"
+    datadir: "/var/lib/pivx/tn6-infra01-obs01"
+    logdir: "/var/log/pivx/tn6-infra01-obs01"
+    confdir: "/etc/pivx/tn6-infra01-obs01"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: ""
+    extra_conf: |
+      # Observer: enable full transaction and address indexing
+      txindex=1
+      addressindex=1
+      timestampindex=1
+      # Allow RPC from monitoring tools on localhost
+      rpcallowip=127.0.0.1

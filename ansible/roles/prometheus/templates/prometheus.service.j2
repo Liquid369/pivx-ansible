@@ -1,0 +1,26 @@
+[Unit]
+Description=Prometheus Time Series Database
+Documentation=https://prometheus.io/docs/introduction/overview/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=prometheus
+Group=prometheus
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --storage.tsdb.retention.time={{ prometheus_retention_time }} \
+  --web.listen-address=:{{ prometheus_port }} \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries \
+  --web.enable-lifecycle
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/prometheus
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,77 @@
+---
+# roles/process_exporter/tasks/main.yml
+# Installs process-exporter to expose per-process metrics to Prometheus.
+# Tracks pivxd, tor, vector, and other key daemons.
+
+- name: Check if process-exporter already installed at target version
+  ansible.builtin.stat:
+    path: "/usr/local/bin/process-exporter"
+  register: pe_bin
+
+- name: Download process-exporter
+  ansible.builtin.get_url:
+    url: "https://github.com/ncabatoff/process-exporter/releases/download/v{{ process_exporter_version }}/process-exporter_{{ process_exporter_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/process-exporter-{{ process_exporter_version }}.tar.gz"
+    mode: "0644"
+  when: not pe_bin.stat.exists
+
+- name: Extract process-exporter
+  ansible.builtin.unarchive:
+    src: "/tmp/process-exporter-{{ process_exporter_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+    creates: "/tmp/process-exporter_{{ process_exporter_version }}_linux_amd64/process-exporter"
+  when: not pe_bin.stat.exists
+
+- name: Install process-exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/process-exporter_{{ process_exporter_version }}_linux_amd64/process-exporter"
+    dest: /usr/local/bin/process-exporter
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not pe_bin.stat.exists
+
+- name: Create process-exporter system user
+  ansible.builtin.user:
+    name: "{{ process_exporter_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/process-exporter
+    create_home: false
+
+- name: Create process-exporter config directory
+  ansible.builtin.file:
+    path: /etc/process-exporter
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write process-exporter config
+  ansible.builtin.template:
+    src: process_exporter.yml.j2
+    dest: /etc/process-exporter/config.yml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart process-exporter
+
+- name: Write process-exporter systemd unit
+  ansible.builtin.template:
+    src: process_exporter.service.j2
+    dest: /etc/systemd/system/process-exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart process-exporter
+
+- name: Enable and start process-exporter
+  ansible.builtin.systemd:
+    name: process-exporter
+    state: started
+    enabled: true
+    daemon_reload: true

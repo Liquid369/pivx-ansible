@@ -1,0 +1,25 @@
+---
+# playbooks/chaos/start_provider.yml
+
+- name: Start all PIVX instances on {{ target_provider }} hosts
+  hosts: "provider_{{ target_provider }}"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Start all PIVX instances
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: started
+      loop: "{{ pivx_instances | default([]) }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Log chaos event
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chaos.log
+        line: "{{ ansible_date_time.iso8601 }} CHAOS start_provider provider={{ target_provider }} host={{ inventory_hostname }}"
+        create: true
+        mode: "0640"
+      ignore_errors: true

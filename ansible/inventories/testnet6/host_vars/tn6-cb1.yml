@@ -1,0 +1,112 @@
+# host_vars/tn6-cb1.yml
+#
+# Contabo host 1 — runs 3 PIVX masternode instances:
+#   Slot 0: IPv4 (tn6-cb1-v4-mn01)
+#   Slot 1: IPv6 (tn6-cb1-v6-mn02)
+#   Slot 2: Tor  (tn6-cb1-tor-mn03)
+#
+# LIFECYCLE:
+#   During Phase 2 (bootstrap_mining): all instances run in seeder mode.
+#     mining_enabled=false, staking_enabled=false, masternode_enabled=false
+#   During Phase 3 (pos_transition): staking_enabled becomes true once coins arrive.
+#   During Phase 4 (masternode_quorum): masternode_enabled=true, bls_operator_key filled.
+#
+# IMPORTANT: Replace all REPLACE_ME values before first deploy.
+# IPs use RFC 5737 / RFC 3849 documentation ranges as placeholders.
+
+# ---------------------------------------------------------------------------
+# Host identity
+# ---------------------------------------------------------------------------
+provider: contabo
+chaos_group: chaos_contabo
+host_label: tn6-cb1
+
+# Public IP addresses (replace with real values)
+host_ipv4: "203.0.113.11"           # REPLACE_ME
+host_ipv6: "2001:db8:cb::11"        # REPLACE_ME
+
+# ---------------------------------------------------------------------------
+# PIVX instance definitions
+#
+# Per-instance lifecycle toggles:
+#   mining_enabled    — allow this instance to mine blocks (Phase 2 only)
+#   staking_enabled   — allow this instance to stake (Phase 3+)
+#   masternode_enabled — register/run as a DMN (Phase 4+)
+#
+# The pivx_instance role generates the correct pivx.conf based on these flags
+# combined with the global lifecycle_phase variable.
+#
+# Schema reference: docs/INVENTORY_MODEL.md
+# ---------------------------------------------------------------------------
+pivx_instances:
+
+  - name: tn6-cb1-v4-mn01
+    enabled: true
+    slot: 0
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51474
+    rpc_port: 51478
+    rpc_user: rpc_v4mn01
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb1-v4-mn01"
+    logdir: "/var/log/pivx/tn6-cb1-v4-mn01"
+    confdir: "/etc/pivx/tn6-cb1-v4-mn01"
+    # Lifecycle toggles — set per-phase
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"   # BLS operator private key — pivx-cli bls generate
+    extra_conf: []
+
+  - name: tn6-cb1-v6-mn02
+    enabled: true
+    slot: 1
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6 }}]"
+    external_ip: "{{ host_ipv6 }}"
+    p2p_port: 51484
+    rpc_port: 51488
+    rpc_user: rpc_v6mn02
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb1-v6-mn02"
+    logdir: "/var/log/pivx/tn6-cb1-v6-mn02"
+    confdir: "/etc/pivx/tn6-cb1-v6-mn02"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: "REPLACE_ME"
+    extra_conf:
+      - "ipv4=0"
+      - "ipv6=1"
+
+  - name: tn6-cb1-tor-mn03
+    enabled: true
+    slot: 2
+    protocol_class: tor
+    cohort: tor
+    role: masternode
+    bind_addr: "127.0.0.1"
+    external_ip: ""            # populated after Tor HS creation; see runbooks/BOOTSTRAP_MINING.md
+    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb1-tor-mn03/hostname
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb1-tor-mn03"
+    p2p_port: 51494
+    rpc_port: 51498
+    rpc_user: rpc_tormn03
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb1-tor-mn03"
+    logdir: "/var/log/pivx/tn6-cb1-tor-mn03"
+    confdir: "/etc/pivx/tn6-cb1-tor-mn03"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: "REPLACE_ME"
+    extra_conf:
+      - "onlynet=onion"
+      - "proxy=127.0.0.1:9050"
+      - "listen=1"

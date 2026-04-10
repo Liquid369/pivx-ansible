@@ -1,0 +1,81 @@
+# host_vars/tn6-ovh5.yml  — AUTO-GENERATED STUB
+# Replace all REPLACE_ME and placeholder IPs (RFC 5737 / RFC 3849 ranges).
+# See tn6-cb1.yml for the full annotated example.
+
+provider: ovh
+chaos_group: chaos_ovh
+host_label: tn6-ovh5
+
+host_ipv4: "203.0.113.25"    # REPLACE_ME
+host_ipv6: "2001:db8:ovh::25"    # REPLACE_ME
+
+pivx_instances:
+
+  - name: tn6-ovh5-v4-mn34
+    enabled: true
+    slot: 0
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51474
+    rpc_port: 51478
+    rpc_user: rpc_v4mn34
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh5-v4-mn34"
+    logdir: "/var/log/pivx/tn6-ovh5-v4-mn34"
+    confdir: "/etc/pivx/tn6-ovh5-v4-mn34"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh5-v6-mn35
+    enabled: true
+    slot: 1
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6 }}]"
+    external_ip: "{{ host_ipv6 }}"
+    p2p_port: 51484
+    rpc_port: 51488
+    rpc_user: rpc_v6mn35
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh5-v6-mn35"
+    logdir: "/var/log/pivx/tn6-ovh5-v6-mn35"
+    confdir: "/etc/pivx/tn6-ovh5-v6-mn35"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf:
+      - "ipv4=0"
+      - "ipv6=1"
+
+  - name: tn6-ovh5-tor-mn36
+    enabled: true
+    slot: 2
+    protocol_class: tor
+    cohort: tor
+    role: masternode
+    bind_addr: "127.0.0.1"
+    external_ip: ""
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-ovh5-tor-mn36"
+    p2p_port: 51494
+    rpc_port: 51498
+    rpc_user: rpc_tormn36
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh5-tor-mn36"
+    logdir: "/var/log/pivx/tn6-ovh5-tor-mn36"
+    confdir: "/etc/pivx/tn6-ovh5-tor-mn36"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf:
+      - "onlynet=onion"
+      - "proxy=127.0.0.1:9050"
+      - "listen=1"

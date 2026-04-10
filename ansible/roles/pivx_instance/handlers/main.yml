@@ -1,0 +1,14 @@
+---
+# roles/pivx_instance/handlers/main.yml
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+# Dynamic handler: one per instance name.
+# The notify string must match: "restart pivx instance <instance.name>"
+- name: "restart pivx instance {{ instance.name }}"
+  ansible.builtin.systemd:
+    name: "pivxd@{{ instance.name }}.service"
+    state: restarted
+  listen: "restart pivx instance {{ instance.name }}"

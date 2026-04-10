@@ -1,0 +1,41 @@
+---
+# playbooks/chaos/clear_netem.yml
+#
+# Removes ALL tc/netem rules from hosts in a cohort (idempotent).
+#
+# Usage:
+#   make chaos-clear COHORT=ipv6
+#
+#   ansible-playbook -i ansible/inventories/testnet6 \
+#     ansible/playbooks/chaos/clear_netem.yml \
+#     -e "target_cohort=ipv6"
+#
+# To clear ALL cohorts at once: omit target_cohort and set hosts: all
+
+- name: Clear netem rules on {{ target_cohort }} cohort hosts
+  hosts: "cohort_{{ target_cohort }}"
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate cohort
+      ansible.builtin.assert:
+        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        msg: "target_cohort must be one of: ipv4, ipv6, tor"
+
+    - name: Log chaos event
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chaos.log
+        line: >-
+          {{ ansible_date_time.iso8601 }} CHAOS clear_netem
+          cohort={{ target_cohort }}
+          host={{ inventory_hostname }}
+        create: true
+        mode: "0640"
+      ignore_errors: true
+
+  tasks:
+    - name: Remove all netem qdisc rules via tc_netem role
+      ansible.builtin.include_role:
+        name: tc_netem
+        tasks_from: clear.yml

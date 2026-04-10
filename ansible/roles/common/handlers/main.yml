@@ -1,0 +1,7 @@
+---
+# roles/common/handlers/main.yml
+
+- name: restart chrony
+  ansible.builtin.service:
+    name: chrony
+    state: restarted

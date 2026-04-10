@@ -1,0 +1,15 @@
+---
+# roles/pivx_bootstrap_miner/defaults/main.yml
+
+# Mining threads — keep low, testnet difficulty is minimal
+bootstrap_mining_threads: 1
+
+# Mining address — MUST be overridden per host in host_vars
+bootstrap_mining_address: ""
+
+# Whether to start mining immediately after configuration
+bootstrap_mining_start_on_deploy: true
+
+# RPC wait retries when checking mining status
+bootstrap_mining_rpc_retries: 30
+bootstrap_mining_rpc_delay: 10

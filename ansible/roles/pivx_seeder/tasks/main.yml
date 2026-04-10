@@ -1,0 +1,54 @@
+---
+# roles/pivx_seeder/tasks/main.yml
+#
+# Applies seed/bootstrap node specific configuration.
+# This role runs AFTER pivx_install and pivx_instance roles.
+#
+# Seed nodes are always-on, high-connection peers that act as
+# introduction points for the testnet. They are also bootstrap miners
+# during Phase 2.
+#
+# This role mainly validates/reports seeder status; the actual config
+# is emitted by pivx_instance via pivx.conf.j2 when role=seeder.
+
+- name: Verify seeder instances are running
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "getnetworkinfo"
+  loop: "{{ pivx_instances | selectattr('role', 'equalto', 'seeder') | selectattr('enabled', 'equalto', true) | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: seeder_netinfo
+  changed_when: false
+  failed_when: false
+
+- name: Report seeder peer counts
+  ansible.builtin.debug:
+    msg: >
+      [{{ item.item.name }}] network info:
+      {{ (item.stdout | from_json).connections | default('N/A') }} connections
+  loop: "{{ seeder_netinfo.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc == 0
+
+- name: Warn if seeder RPC is not responding
+  ansible.builtin.debug:
+    msg: "WARNING: Seeder instance {{ item.item.name }} did not respond to RPC. Check: journalctl -u pivxd@{{ item.item.name }}"
+  loop: "{{ seeder_netinfo.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc != 0
+
+- name: Ensure seeder P2P port is accessible in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.p2p_port | string }}"
+    proto: tcp
+    comment: "{{ seeder_ufw_comment }} — {{ item.name }}"
+  loop: "{{ pivx_instances | selectattr('role', 'equalto', 'seeder') | selectattr('enabled', 'equalto', true) | list }}"
+  loop_control:
+    label: "{{ item.name }}"

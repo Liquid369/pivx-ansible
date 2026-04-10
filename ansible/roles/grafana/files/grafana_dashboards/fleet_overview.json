@@ -1,0 +1,91 @@
+{
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0"},
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0"}
+  ],
+  "annotations": {"list": []},
+  "description": "PIVX Testnet6 — Node Fleet Overview",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red",   "value": 0}
+            ]
+          }
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background"},
+      "title": "Fleet Nodes Up",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(up{job='node_exporter'} == 1)",
+          "legendFormat": "Up"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+      "id": 2,
+      "title": "CPU Usage by Host",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "100 - (avg by (instance, provider) (rate(node_cpu_seconds_total{mode='idle',job='node_exporter'}[5m])) * 100)",
+          "legendFormat": "{{instance}} ({{provider}})"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes", "color": {"mode": "palette-classic"}}},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "id": 3,
+      "title": "Memory Usage by Host",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes{job='node_exporter'} - node_memory_MemAvailable_bytes{job='node_exporter'}",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["testnet6", "pivx", "fleet"],
+  "templating": {
+    "list": [
+      {
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(up{job='node_exporter'}, provider)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "provider",
+        "query": "label_values(up{job='node_exporter'}, provider)",
+        "type": "query",
+        "label": "Provider"
+      }
+    ]
+  },
+  "time": {"from": "now-3h", "to": "now"},
+  "title": "Testnet6 Fleet Overview",
+  "uid": "tn6-fleet-overview",
+  "version": 1
+}

@@ -1,0 +1,66 @@
+---
+# roles/pivx_observer/tasks/main.yml
+#
+# Observer node configuration.
+# Observer nodes run a full PIVX node with txindex/addressindex enabled
+# and expose RPC for monitoring queries without participating in consensus.
+#
+# This role runs AFTER pivx_instance and validates the observer is up.
+
+- name: Find observer instances
+  ansible.builtin.set_fact:
+    observer_instances: >-
+      {{ pivx_instances | selectattr('role', 'equalto', 'observer')
+                        | selectattr('enabled', 'equalto', true) | list }}
+
+- name: Check blockchain sync status on observer instances
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "getblockchaininfo"
+  loop: "{{ observer_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: chaininfo_result
+  changed_when: false
+  failed_when: false
+
+- name: Show observer sync status
+  ansible.builtin.debug:
+    msg: >
+      [{{ item.item.name }}]
+      blocks={{ (item.stdout | from_json).blocks | default('N/A') }},
+      headers={{ (item.stdout | from_json).headers | default('N/A') }},
+      synced={{ (item.stdout | from_json).initialblockdownload | default(true) | ternary('no','yes') }}
+  loop: "{{ chaininfo_result.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc == 0
+
+- name: Show quorum list (available in Phase 4+)
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "quorum"
+      - "list"
+  loop: "{{ observer_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: quorum_list_result
+  changed_when: false
+  failed_when: false
+  when: lifecycle_phase in ['masternode_quorum', 'chaos_testing']
+
+- name: Display quorum list
+  ansible.builtin.debug:
+    msg: "[{{ item.item.name }}] quorum list: {{ item.stdout }}"
+  loop: "{{ quorum_list_result.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - quorum_list_result is defined
+    - item.rc == 0

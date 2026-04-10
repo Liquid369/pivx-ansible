@@ -1,0 +1,110 @@
+---
+# roles/pivx_instance/tasks/main.yml
+#
+# Deploys ONE PIVX instance from the `instance` dict passed in.
+#
+# Usage (from deploy_pivx.yml):
+#   - ansible.builtin.include_role:
+#       name: pivx_instance
+#     vars:
+#       instance: "{{ item }}"
+#     loop: "{{ pivx_instances }}"
+#     when: item.enabled | default(true)
+#
+# The role renders pivx.conf based on:
+#   - instance.protocol_class  (ipv4 / ipv6 / tor)
+#   - instance.role            (masternode / seeder / observer)
+#   - instance.mining_enabled  (Phase 2 only)
+#   - instance.staking_enabled (Phase 3+)
+#   - instance.masternode_enabled (Phase 4+)
+#
+# Lifecycle is controlled via lifecycle_phase (group_vars/all/main.yml).
+
+# ---------------------------------------------------------------------------
+# Directories
+# ---------------------------------------------------------------------------
+- name: "[{{ instance.name }}] Create instance directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    mode: "0750"
+  loop:
+    - "{{ instance.datadir }}"
+    - "{{ instance.logdir }}"
+    - "{{ instance.confdir }}"
+
+# ---------------------------------------------------------------------------
+# Configuration files
+# ---------------------------------------------------------------------------
+- name: "[{{ instance.name }}] Write pivx.conf"
+  ansible.builtin.template:
+    src: pivx.conf.j2
+    dest: "{{ instance.confdir }}/pivx.conf"
+    owner: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    mode: "0640"
+  notify: "restart pivx instance {{ instance.name }}"
+
+- name: "[{{ instance.name }}] Write environment file"
+  ansible.builtin.template:
+    src: pivx_instance.env.j2
+    dest: "{{ instance.confdir }}/instance.env"
+    owner: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    mode: "0640"
+  notify: "restart pivx instance {{ instance.name }}"
+
+# ---------------------------------------------------------------------------
+# Systemd unit
+# ---------------------------------------------------------------------------
+- name: "[{{ instance.name }}] Install systemd unit"
+  ansible.builtin.template:
+    src: pivxd@.service.j2
+    dest: "/etc/systemd/system/pivxd@{{ instance.name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - "restart pivx instance {{ instance.name }}"
+
+- name: "[{{ instance.name }}] Reload systemd and manage service state"
+  ansible.builtin.systemd:
+    name: "pivxd@{{ instance.name }}.service"
+    enabled: "{{ instance.enabled | default(true) }}"
+    state: "{{ 'started' if (instance.enabled | default(true)) else 'stopped' }}"
+    daemon_reload: true
+
+# ---------------------------------------------------------------------------
+# Startup check — wait for RPC to respond
+# ---------------------------------------------------------------------------
+- name: "[{{ instance.name }}] Wait for RPC to respond"
+  ansible.builtin.command:
+    argv:
+      - "{{ pivx_cli_binary }}"
+      - "-conf={{ instance.confdir }}/pivx.conf"
+      - "-datadir={{ instance.datadir }}"
+      - "getblockchaininfo"
+  register: rpc_check
+  until: rpc_check.rc == 0
+  retries: "{{ pivx_rpc_wait_retries }}"
+  delay: "{{ pivx_rpc_wait_delay }}"
+  changed_when: false
+  failed_when: false   # non-fatal; avoids blocking the play if daemon is slow
+  check_mode: false
+  when: instance.enabled | default(true)
+
+- name: "[{{ instance.name }}] Warn if RPC did not respond in time"
+  ansible.builtin.debug:
+    msg: >
+      WARNING: Instance {{ instance.name }} did not respond to RPC within
+      {{ pivx_rpc_wait_retries * pivx_rpc_wait_delay }}s.
+      Check: journalctl -u pivxd@{{ instance.name }} -n 50
+  when:
+    - instance.enabled | default(true)
+    - rpc_check is defined
+    - rpc_check.rc != 0
+
+

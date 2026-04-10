@@ -1,0 +1,48 @@
+---
+# playbooks/chaos/inject_latency.yml
+# Add tc/netem latency to all hosts in a protocol cohort.
+#
+# Usage:
+#   make chaos-inject-latency COHORT=ipv6 DELAY=200ms JITTER=20ms
+#
+#   ansible-playbook -i ansible/inventories/testnet6 \
+#     ansible/playbooks/chaos/inject_latency.yml \
+#     -e "target_cohort=ipv6 netem_latency=200ms netem_jitter=20ms"
+#
+# Vars (all optional, have defaults in tc_netem/defaults/main.yml):
+#   netem_latency   : e.g. "200ms"  (default: 100ms)
+#   netem_jitter    : e.g. "20ms"   (default: 10ms)
+#   netem_interface : e.g. "eth0"   (default: auto-detect)
+#
+# NOTE: netem rules apply to ALL traffic on the interface, not just PIVX p2p.
+# This is intentional for realistic network simulation.
+
+- name: Inject network latency on {{ target_cohort }} cohort hosts
+  hosts: "cohort_{{ target_cohort }}"
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate cohort
+      ansible.builtin.assert:
+        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        msg: "target_cohort must be one of: ipv4, ipv6, tor"
+
+    - name: Log chaos event
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chaos.log
+        line: >-
+          {{ ansible_date_time.iso8601 }} CHAOS inject_latency
+          cohort={{ target_cohort }}
+          latency={{ netem_latency | default('100ms') }}
+          jitter={{ netem_jitter | default('10ms') }}
+          host={{ inventory_hostname }}
+        create: true
+        mode: "0640"
+      ignore_errors: true
+
+  tasks:
+    - name: Apply latency via tc_netem role
+      ansible.builtin.include_role:
+        name: tc_netem
+        tasks_from: inject_latency.yml

@@ -1,0 +1,26 @@
+# group_vars/masternodes.yml
+# Defaults that apply to all masternode hosts.
+
+node_role: masternode
+
+# Each masternode host runs 3 PIVX instances: IPv4, IPv6, Tor
+# The actual instance definitions live in host_vars per host.
+# This group_var sets the expected count for validation.
+pivx_instances_expected: 3
+
+# Lifecycle note:
+#   Phase 2 (bootstrap_mining): MN hosts run instances WITHOUT masternode config.
+#     They connect to the chain as peers, help form the network, wait for coins.
+#   Phase 3 (staking): staking_enabled flipped, coins begin staking.
+#   Phase 4 (masternode_quorum): masternode_enabled flipped after DMN registration.
+#   The pivx.conf template reads per-instance lifecycle flags to emit the right config.
+
+# Masternode-specific PIVX config (applied only when masternode_enabled=true per instance)
+# This is handled inside the pivx.conf.j2 template — not injected here directly.
+
+# Firewall: open p2p ports for masternode range (slots 0-2)
+ufw_pivx_ports:
+  - "{{ pivx_p2p_port_base }}"
+  - "{{ pivx_p2p_port_base + 10 }}"
+  - "{{ pivx_p2p_port_base + 20 }}"
+

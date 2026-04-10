@@ -1,0 +1,22 @@
+---
+# roles/grafana/defaults/main.yml
+
+grafana_version: "latest"   # installed via APT repo — tracks stable channel
+grafana_port: 3000
+
+# Admin credentials — CHANGE THESE before exposing Grafana externally.
+# For testnet use, these are acceptable defaults.
+grafana_admin_user: admin
+grafana_admin_password: "REPLACE_ME"   # set in vault.yml
+
+# Datasource names (must match provisioning templates)
+grafana_prometheus_datasource_name: "Prometheus"
+grafana_loki_datasource_name: "Loki"
+
+# Dashboard provisioning path
+grafana_dashboards_path: /etc/grafana/provisioning/dashboards
+grafana_datasources_path: /etc/grafana/provisioning/datasources
+
+# URLs for datasources (resolved to infra host)
+grafana_prometheus_url: "http://{{ loki_host | default('localhost') }}:9090"
+grafana_loki_url: "http://{{ loki_host | default('localhost') }}:3100"

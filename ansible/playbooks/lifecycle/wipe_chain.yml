@@ -1,0 +1,125 @@
+---
+# playbooks/lifecycle/wipe_chain.yml
+#
+# Performs a complete testnet reset on all fleet hosts.
+#
+# USE CASE: When you want to restart the testnet from block 0.
+#   This is common during PIVX testnet development when:
+#   - The chain is in an unrecoverable state
+#   - Network parameters changed and need a genesis restart
+#   - You want a clean slate for fresh quorum testing
+#
+# WHAT IT DOES:
+#   1. Stops all pivxd instances
+#   2. Deletes chain data (blocks, chainstate, peers.dat, mempool.dat)
+#   3. Optionally preserves wallet.dat and Tor private keys
+#   4. Does NOT touch config files or systemd units (they remain)
+#
+# AFTER THIS PLAYBOOK:
+#   Run: make start-bootstrap-mining
+#   Chain will start from genesis and mine up to PoS threshold.
+#
+# SAFETY:
+#   - Dry-run first: make wipe-chain-dry-run
+#   - chain_wipe_keep_wallet=true (default) preserves wallet files
+#   - chain_wipe_keep_tor_keys=true (default) preserves Tor HS private keys
+
+- name: "PHASE 0 — Wipe chain data for full testnet restart"
+  hosts: "{{ target_hosts | default('masternodes:seeders:observers') }}"
+  become: true
+  serial: 1                    # Process one host at a time for safety
+  max_fail_percentage: 0       # Abort everything if any wipe fails
+
+  vars:
+    # Override these at runtime if needed:
+    #   -e "chain_wipe_keep_wallet=false"  to also wipe wallets
+    chain_wipe_keep_wallet: true
+    chain_wipe_keep_tor_keys: true
+
+  tasks:
+
+    - name: "Confirm wipe is intentional"
+      ansible.builtin.pause:
+        prompt: >
+          ============================================================
+          DESTRUCTIVE OPERATION: CHAIN WIPE on {{ inventory_hostname }}
+          This will DELETE all blockchain data.
+          wallet preserved: {{ chain_wipe_keep_wallet }}
+          Tor keys preserved: {{ chain_wipe_keep_tor_keys }}
+
+          Press ENTER to continue for this host, Ctrl+C to abort all.
+          ============================================================
+      when: not (skip_confirmation | default(false))
+
+    - name: "Stop all PIVX instances"
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: stopped
+      loop: "{{ pivx_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      failed_when: false   # ok if already stopped
+
+    - name: "Wait for instances to fully stop"
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: "Remove chain data directories (keep wallet if requested)"
+      ansible.builtin.shell:
+        cmd: |
+          DATADIR="{{ item.datadir }}"
+          cd "$DATADIR" || exit 0
+
+          # Always remove pure chain data
+          rm -rf blocks/ chainstate/ peers.dat mempool.dat
+
+          # Remove DKG/quorum state
+          rm -rf llmq/ evodb/ zerocoin/
+
+          # If not keeping wallet, wipe wallet files too
+          {% if not chain_wipe_keep_wallet %}
+          rm -f wallet.dat backupwallet.dat
+          {% else %}
+          echo "Preserving wallet.dat in $DATADIR"
+          {% endif %}
+
+          echo "Wiped: $DATADIR"
+      args:
+        executable: /bin/bash
+      loop: "{{ pivx_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: wipe_result
+      changed_when: true
+
+    - name: "Show wipe results"
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines }}"
+      loop: "{{ wipe_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: "Log chain wipe event"
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chain_wipe.log
+        line: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }} CHAIN_WIPE host={{ inventory_hostname }} keep_wallet={{ chain_wipe_keep_wallet }} operator={{ lookup('env', 'USER') }}"
+        create: true
+        mode: "0644"
+
+- name: "Print post-wipe instructions"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Next steps"
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Chain wipe complete.
+
+          NEXT STEPS:
+          1. Ensure lifecycle_phase=bootstrap_mining in group_vars/all/main.yml
+          2. Run: make deploy-pivx            (re-deploys instances, they'll start fresh)
+          3. Run: make start-bootstrap-mining (starts CPU mining on seed nodes)
+          4. Monitor: make status
+          5. When height >= {{ mining_phase_target_height | default(201) }}: make transition-to-pos
+          ============================================================
