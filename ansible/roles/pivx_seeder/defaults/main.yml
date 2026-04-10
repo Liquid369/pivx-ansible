@@ -1,0 +1,11 @@
+---
+# roles/pivx_seeder/defaults/main.yml
+
+# Maximum peer connections for seed nodes — higher than regular nodes
+seeder_maxconnections: 256
+
+# Whether to enable transaction indexing on the seed node
+seeder_txindex: 0
+
+# Additional UFW rules for seed nodes
+seeder_ufw_comment: "PIVX seed node P2P"

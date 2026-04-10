@@ -1,0 +1,12 @@
+---
+# roles/tor_hidden_service/defaults/main.yml
+
+tor_user: debian-tor
+tor_group: debian-tor
+tor_hidden_service_base_dir: /var/lib/tor/pivx_hs
+tor_socks_port: 9050
+tor_control_port: 9051
+
+# One Tor daemon per host, multiple hidden services.
+# This is simpler to manage than per-instance Tor daemons.
+# Each PIVX Tor instance gets its own HiddenServiceDir and HiddenServicePort.

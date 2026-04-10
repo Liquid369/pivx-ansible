@@ -1,0 +1,168 @@
+---
+# roles/pivx_install/tasks/main.yml
+#
+# Installs the PIVX binary using a versioned directory layout:
+#
+#   /opt/pivx/releases/<version>/bin/pivxd   ← per-version binary
+#   /opt/pivx/current                        ← symlink to active version
+#   /usr/local/bin/pivxd                     ← convenience symlink
+#
+# Idempotent: skips download if version already installed.
+# Safe upgrade: installs new version alongside current; flips symlinks atomically.
+
+# ---------------------------------------------------------------------------
+# User and base directories
+# ---------------------------------------------------------------------------
+- name: Create pivx system group
+  ansible.builtin.group:
+    name: "{{ pivx_group }}"
+    system: true
+    state: present
+
+- name: Create pivx system user
+  ansible.builtin.user:
+    name: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "/home/{{ pivx_user }}"
+    create_home: true
+    state: present
+
+- name: Create releases base directory
+  ansible.builtin.file:
+    path: "{{ pivx_releases_base }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# ---------------------------------------------------------------------------
+# Download and install binary (idempotent via version-named dir)
+# ---------------------------------------------------------------------------
+- name: Check if PIVX {{ pivx_version }} already installed
+  ansible.builtin.stat:
+    path: "{{ pivx_bin_dir }}/pivxd"
+  register: pivxd_stat
+
+- name: Create version install directory
+  ansible.builtin.file:
+    path: "{{ pivx_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not pivxd_stat.stat.exists
+
+- name: Download PIVX archive
+  ansible.builtin.get_url:
+    url: "{{ pivx_archive_url }}"
+    dest: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    checksum: "{{ pivx_checksum }}"
+    mode: "0644"
+    timeout: 120
+  when: not pivxd_stat.stat.exists
+
+- name: Extract PIVX archive to versioned directory
+  ansible.builtin.unarchive:
+    src: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    dest: "{{ pivx_releases_base }}/"
+    remote_src: true
+    # GitHub tarballs extract as pivx-<version>/ — rename to our versioned dir
+    extra_opts:
+      - "--one-top-level={{ pivx_version }}"
+      - "--strip-components=1"
+    creates: "{{ pivx_bin_dir }}/pivxd"
+  when: not pivxd_stat.stat.exists
+
+- name: Set binary permissions
+  ansible.builtin.file:
+    path: "{{ pivx_bin_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - pivxd
+    - pivx-cli
+    - pivx-tx
+    - sapling-fetch-params
+  when: not pivxd_stat.stat.exists
+
+- name: Clean up downloaded archive
+  ansible.builtin.file:
+    path: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    state: absent
+
+# ---------------------------------------------------------------------------
+# Update /opt/pivx/current symlink to activate this version
+# ---------------------------------------------------------------------------
+- name: Point /opt/pivx/current to {{ pivx_version }}
+  ansible.builtin.file:
+    src: "{{ pivx_install_dir }}"
+    dest: "{{ pivx_current_link }}"
+    state: link
+    force: true
+  when: pivx_set_current | default(true)
+  register: current_link_changed
+
+# ---------------------------------------------------------------------------
+# Convenience symlinks in /usr/local/bin
+# ---------------------------------------------------------------------------
+- name: Update /usr/local/bin symlinks
+  ansible.builtin.file:
+    src: "{{ pivx_bin_dir }}/{{ item }}"
+    dest: "{{ pivx_symlink_dir }}/{{ item }}"
+    state: link
+    force: true
+  loop:
+    - pivxd
+    - pivx-cli
+    - pivx-tx
+    - sapling-fetch-params
+
+# ---------------------------------------------------------------------------
+# Sapling parameters (required before pivxd will start)
+# ---------------------------------------------------------------------------
+- name: Ensure Sapling params directory exists
+  ansible.builtin.file:
+    path: "{{ pivx_params_dir }}"
+    state: directory
+    owner: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    mode: "0700"
+
+- name: Stat Sapling parameter files
+  ansible.builtin.stat:
+    path: "{{ pivx_params_dir }}/{{ item.name }}"
+  loop: "{{ pivx_sapling_params }}"
+  register: sapling_stat
+
+- name: Download missing Sapling parameter files
+  ansible.builtin.get_url:
+    url: "{{ item.item.url }}"
+    dest: "{{ pivx_params_dir }}/{{ item.item.name }}"
+    checksum: "{{ item.item.checksum }}"
+    owner: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
+    mode: "0640"
+    timeout: 300
+  loop: "{{ sapling_stat.results }}"
+  when: not item.stat.exists
+  loop_control:
+    label: "{{ item.item.name }}"
+
+# ---------------------------------------------------------------------------
+# Verify installation
+# ---------------------------------------------------------------------------
+- name: Verify pivxd version
+  ansible.builtin.command:
+    cmd: "{{ pivx_current_link }}/bin/pivxd --version"
+  register: pivxd_version_out
+  changed_when: false
+  check_mode: false
+
+- name: Show installed version
+  ansible.builtin.debug:
+    msg: "Installed: {{ pivxd_version_out.stdout_lines | first }}"
+
+

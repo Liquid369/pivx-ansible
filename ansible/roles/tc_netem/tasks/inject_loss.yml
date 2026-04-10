@@ -1,0 +1,47 @@
+---
+# roles/tc_netem/tasks/inject_loss.yml
+#
+# Injects packet loss on the host's primary network interface.
+# To clear: run clear.yml or `make chaos-clear`
+
+- name: Resolve primary interface when netem_interface=auto
+  ansible.builtin.shell:
+    cmd: "ip route show default | awk '/default/ {print $5}' | head -1"
+  register: default_iface_result
+  changed_when: false
+  when: netem_interface == 'auto'
+
+- name: Set resolved interface fact
+  ansible.builtin.set_fact:
+    _netem_iface: "{{ default_iface_result.stdout | trim if netem_interface == 'auto' else netem_interface }}"
+
+- name: Show target interface and parameters
+  ansible.builtin.debug:
+    msg: >
+      Injecting packet loss on {{ inventory_hostname }}:
+      iface={{ _netem_iface }}
+      loss={{ netem_loss_percent }}
+      correlation={{ netem_loss_correlation }}
+
+- name: Clear any existing root qdisc first
+  ansible.builtin.command:
+    cmd: "tc qdisc del dev {{ _netem_iface }} root"
+  changed_when: true
+  failed_when: false
+
+- name: Apply netem packet loss qdisc
+  ansible.builtin.command:
+    cmd: >
+      tc qdisc add dev {{ _netem_iface }} root netem
+      loss {{ netem_loss_percent }} {{ netem_loss_correlation }}
+  changed_when: true
+
+- name: Verify netem is applied
+  ansible.builtin.command:
+    cmd: "tc qdisc show dev {{ _netem_iface }}"
+  register: tc_show
+  changed_when: false
+
+- name: Show active tc qdiscs
+  ansible.builtin.debug:
+    msg: "{{ tc_show.stdout_lines }}"

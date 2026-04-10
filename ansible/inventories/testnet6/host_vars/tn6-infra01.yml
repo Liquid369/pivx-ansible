@@ -1,0 +1,40 @@
+# host_vars/tn6-infra01.yml
+# Contabo infra host — runs observer PIVX node + full monitoring stack.
+# This host is intentionally NOT a masternode.
+
+provider: contabo
+chaos_group: chaos_contabo
+host_label: tn6-infra01
+
+host_ipv4: "203.0.113.41"           # REPLACE_ME
+host_ipv6: "2001:db8:cb::41"        # REPLACE_ME
+
+# Observer PIVX instance
+pivx_instances:
+
+  - name: tn6-obs01
+    enabled: true
+    slot: 0
+    protocol_class: ipv4
+    cohort: ipv4
+    role: observer
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51474
+    rpc_port: 51478
+    rpc_user: rpc_obs01
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-obs01"
+    logdir: "/var/log/pivx/tn6-obs01"
+    confdir: "/etc/pivx/tn6-obs01"
+    bls_operator_key: ""
+    extra_conf:
+      - "txindex=1"
+      - "maxconnections=64"
+
+# Monitoring stack — ports for firewall
+monitoring_exposed_ports:
+  - 9090    # Prometheus
+  - 3000    # Grafana
+  - 3100    # Loki
+  - 9093    # Alertmanager

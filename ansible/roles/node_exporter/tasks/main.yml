@@ -1,0 +1,69 @@
+---
+# roles/node_exporter/tasks/main.yml
+# Installs Prometheus node_exporter as a systemd service.
+# Version controlled via node_exporter_version variable.
+
+- name: Set node_exporter version default
+  ansible.builtin.set_fact:
+    _ne_version: "{{ node_exporter_version | default('1.7.0') }}"
+
+- name: Check if node_exporter already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/node_exporter
+  register: ne_bin
+
+- name: Download node_exporter
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ _ne_version }}/node_exporter-{{ _ne_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter-{{ _ne_version }}.tar.gz"
+    mode: "0644"
+  when: not ne_bin.stat.exists
+
+- name: Extract node_exporter
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ _ne_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+    creates: "/tmp/node_exporter-{{ _ne_version }}.linux-amd64/node_exporter"
+  when: not ne_bin.stat.exists
+
+- name: Install node_exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ _ne_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not ne_bin.stat.exists
+
+- name: Create node_exporter system user
+  ansible.builtin.user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Install node_exporter systemd unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart node_exporter
+
+- name: ufw - allow node_exporter (from monitoring host only)
+  community.general.ufw:
+    rule: allow
+    src: "{{ hostvars[monitoring_host]['ansible_host'] }}"
+    port: "{{ node_exporter_port }}"
+    proto: tcp
+
+- name: Enable and start node_exporter
+  ansible.builtin.service:
+    name: node_exporter
+    state: started
+    enabled: true

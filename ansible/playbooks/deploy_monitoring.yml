@@ -1,0 +1,24 @@
+---
+# playbooks/deploy_monitoring.yml
+# Deploys the full observability stack to tn6-infra01,
+# and installs node_exporter + Vector on every fleet host.
+
+- name: Install node_exporter on all fleet hosts
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - node_exporter
+    - vector
+
+- name: Deploy Prometheus, Loki, Grafana, Alertmanager on monitoring host
+  hosts: monitoring
+  become: true
+  gather_facts: true
+
+  roles:
+    - prometheus
+    - loki
+    - grafana
+    - alertmanager

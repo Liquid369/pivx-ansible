@@ -1,0 +1,55 @@
+---
+# roles/vector/tasks/main.yml
+# Installs Vector log shipper and configures journal + file scraping
+# for all PIVX instances on this host.
+#
+# Vector chosen over Promtail because:
+#   - Single binary, richer transforms, active development
+#   - Native journald source (no extra dependencies)
+#   - VRL (Vector Remap Language) for structured log parsing
+#   - Better memory profile for multi-instance hosts
+
+- name: Set Vector version default
+  ansible.builtin.set_fact:
+    _vector_version: "{{ vector_version | default('0.37.0') }}"
+
+- name: Add Vector apt repo key
+  ansible.builtin.get_url:
+    url: https://packages.timber.io/vector/debian/pool/main/v/vector/vector_{{ _vector_version }}-1_amd64.deb
+    dest: "/tmp/vector_{{ _vector_version }}_amd64.deb"
+    mode: "0644"
+
+- name: Install Vector .deb
+  ansible.builtin.apt:
+    deb: "/tmp/vector_{{ _vector_version }}_amd64.deb"
+    state: present
+
+- name: Create Vector config directory
+  ansible.builtin.file:
+    path: /etc/vector
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write Vector main config
+  ansible.builtin.template:
+    src: vector.toml.j2
+    dest: /etc/vector/vector.toml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart vector
+
+- name: ufw - allow Vector API (from monitoring host only)
+  community.general.ufw:
+    rule: allow
+    src: "{{ hostvars[monitoring_host]['ansible_host'] }}"
+    port: "{{ vector_port }}"
+    proto: tcp
+
+- name: Enable and start Vector
+  ansible.builtin.service:
+    name: vector
+    state: started
+    enabled: true

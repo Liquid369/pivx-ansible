@@ -1,0 +1,20 @@
+---
+# roles/chaos/tasks/clear_netem.yml
+
+- name: Set target interface
+  ansible.builtin.set_fact:
+    _iface: "{{ netem_iface | default(ansible_default_ipv4.interface) }}"
+
+- name: Remove all qdisc rules on interface
+  ansible.builtin.command: "tc qdisc del dev {{ _iface }} root"
+  ignore_errors: true
+  changed_when: true
+
+- name: Confirm cleared
+  ansible.builtin.command: "tc qdisc show dev {{ _iface }}"
+  register: tc_show
+  changed_when: false
+
+- name: Show tc state post-clear
+  ansible.builtin.debug:
+    msg: "{{ tc_show.stdout }}"

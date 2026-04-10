@@ -1,0 +1,31 @@
+---
+# roles/prometheus/defaults/main.yml
+
+prometheus_version: "2.50.0"
+prometheus_port: 9090
+prometheus_retention_time: "30d"
+prometheus_scrape_interval: "15s"
+prometheus_evaluation_interval: "15s"
+
+# Where the rules file will be written
+prometheus_rules_dir: /etc/prometheus/rules
+
+# node_exporter port (must match node_exporter role)
+node_exporter_port: 9100
+
+# process_exporter port (if deployed)
+process_exporter_port: 9256
+
+# blackbox_exporter port (if deployed)
+blackbox_exporter_port: 9115
+
+# Set to true to enable blackbox TCP probing of PIVX P2P ports
+prometheus_blackbox_enabled: false
+
+# Set to true to enable process_exporter scraping
+prometheus_process_exporter_enabled: false
+
+# External labels added to all Prometheus metrics
+prometheus_external_labels:
+  cluster: testnet6
+  chain: pivx-testnet6

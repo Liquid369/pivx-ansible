@@ -1,0 +1,12 @@
+---
+# process_exporter config — which processes to track
+# Groups are matched by command-line patterns (regex supported).
+
+process_names:
+{% for p in process_exporter_process_names %}
+  - name: {{ p.name }}
+    cmdline:
+{% for pattern in p.cmdline %}
+      - {{ pattern }}
+{% endfor %}
+{% endfor %}

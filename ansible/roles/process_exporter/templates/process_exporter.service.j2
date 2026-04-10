@@ -1,0 +1,16 @@
+[Unit]
+Description=process-exporter — Prometheus process metrics exporter
+After=network.target
+
+[Service]
+User={{ process_exporter_user }}
+ExecStart=/usr/local/bin/process-exporter \
+  -config.path /etc/process-exporter/config.yml \
+  -web.listen-address :{{ process_exporter_port }}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

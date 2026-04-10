@@ -1,0 +1,141 @@
+---
+# roles/pivx_masternode/tasks/main.yml
+#
+# Activates and verifies masternode behavior for instances that have
+# masternode_enabled: true.
+#
+# PREREQUISITES (must be done BEFORE this role runs):
+#   1. pivx_instance role has run and instance is started
+#   2. ProRegTx broadcast and confirmed on-chain (done externally via Core wallet)
+#   3. bls_operator_key populated in host_vars (not REPLACE_ME)
+#   4. lifecycle_phase set to masternode_quorum in group_vars
+#
+# This role is IDEMPOTENT: it only verifies, never writes destructive changes.
+
+- name: Gather masternode-enabled instances for this host
+  ansible.builtin.set_fact:
+    mn_instances: >-
+      {{ pivx_instances
+         | selectattr('enabled', 'equalto', true)
+         | selectattr('masternode_enabled', 'defined')
+         | selectattr('masternode_enabled', 'equalto', true)
+         | list }}
+
+- name: Skip host if no masternode instances defined
+  ansible.builtin.meta: end_host
+  when: mn_instances | length == 0
+
+- name: Warn about placeholder BLS keys
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: Instance {{ item.name }} has masternode_enabled=true but
+      bls_operator_key is still a placeholder ('{{ item.bls_operator_key }}').
+      Generate a BLS keypair: pivx-cli bls generate
+      Then fill bls_operator_key in host_vars/{{ inventory_hostname }}.yml
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.bls_operator_key | default('') in ['', 'REPLACE_ME']
+
+- name: Fail if BLS key placeholder and fail_on_unregistered is true
+  ansible.builtin.fail:
+    msg: >
+      Instance {{ item.name }}: bls_operator_key is not set. Cannot activate
+      masternode. Set masternode_fail_on_unregistered=false to warn-only.
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.bls_operator_key | default('') in ['', 'REPLACE_ME']
+    - masternode_fail_on_unregistered | bool
+
+- name: Ensure pivxd service is running for each masternode instance
+  ansible.builtin.systemd:
+    name: "pivxd@{{ item.name }}"
+    state: started
+    enabled: true
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Wait for RPC to become available
+  ansible.builtin.command:
+    argv:
+      - "{{ pivx_cli_binary }}"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "getblockchaininfo"
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: rpc_check
+  retries: "{{ masternode_rpc_wait_retries }}"
+  delay: "{{ masternode_rpc_wait_delay }}"
+  until: rpc_check.rc == 0
+  changed_when: false
+  failed_when: false
+
+- name: Query masternode status
+  ansible.builtin.command:
+    argv:
+      - "{{ pivx_cli_binary }}"
+      - "-conf={{ item.confdir }}/pivx.conf"
+      - "-datadir={{ item.datadir }}"
+      - "masternode"
+      - "status"
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: mn_status_results
+  changed_when: false
+  failed_when: false
+
+- name: Display masternode status
+  ansible.builtin.debug:
+    msg: |
+      [{{ item.item.name }}] Masternode status:
+      {{ item.stdout | default('RPC not available: ' + item.stderr) }}
+  loop: "{{ mn_status_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Parse masternode state from status output
+  ansible.builtin.set_fact:
+    mn_state_map: >-
+      {{ mn_state_map | default({}) | combine({
+           item.item.name: (item.stdout | from_json).status | default('UNKNOWN')
+         }) }}
+  loop: "{{ mn_status_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc == 0
+  failed_when: false
+
+- name: Warn about masternodes not in READY state
+  ansible.builtin.debug:
+    msg: >-
+      Instance {{ item.name }} status is
+      {{ mn_state_map[item.name] | default('UNKNOWN') }} — not yet READY.
+      If ProRegTx was recently broadcast, allow 6+ confirmations.
+      Then re-run: make enable-masternodes
+  loop: "{{ mn_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: mn_state_map[item.name] | default('UNKNOWN') not in ['READY', 'ENABLED']
+
+- name: Check LLMQ quorum list (one sample per host)
+  ansible.builtin.command:
+    argv:
+      - "{{ pivx_cli_binary }}"
+      - "-conf={{ (mn_instances | first).confdir }}/pivx.conf"
+      - "-datadir={{ (mn_instances | first).datadir }}"
+      - "quorum"
+      - "list"
+  register: quorum_list_result
+  changed_when: false
+  failed_when: false
+
+- name: Display quorum list
+  ansible.builtin.debug:
+    msg: "Quorum list: {{ quorum_list_result.stdout | default('N/A') }}"
+  when: quorum_list_result.rc == 0

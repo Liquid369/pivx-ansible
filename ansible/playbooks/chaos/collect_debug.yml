@@ -1,0 +1,92 @@
+---
+# playbooks/chaos/collect_debug.yml
+# Gathers a debug bundle from all PIVX instances on all fleet hosts.
+# Output lands in debug_bundles/<timestamp>/<host>/ locally.
+#
+# What is collected:
+#   - pivx-cli debug info (getblockchaininfo, getpeerinfo, quorum list, masternode list)
+#   - Last 500 lines of each instance log
+#   - tc/netem state
+#   - Systemd unit status
+
+- name: Collect debug bundles from all fleet hosts
+  hosts: masternodes:seeders:observers
+  become: true
+  gather_facts: true
+
+  vars:
+    _bundle_ts: "{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}"
+    _remote_bundle_dir: "/tmp/pivx_debug_{{ _bundle_ts }}"
+
+  tasks:
+    - name: Create remote bundle staging dir
+      ansible.builtin.file:
+        path: "{{ _remote_bundle_dir }}/{{ inventory_hostname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Collect pivx-cli state per instance
+      ansible.builtin.shell: |
+        CLI="{{ pivx_symlink_dir }}/pivx-cli"
+        CONF="{{ item.confdir }}/pivx.conf"
+        DDIR="{{ item.datadir }}"
+        OUTDIR="{{ _remote_bundle_dir }}/{{ inventory_hostname }}/{{ item.name }}"
+        mkdir -p "$OUTDIR"
+        $CLI -conf="$CONF" -datadir="$DDIR" getblockchaininfo > "$OUTDIR/getblockchaininfo.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" getpeerinfo        > "$OUTDIR/getpeerinfo.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" masternode list     > "$OUTDIR/mn_list.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" quorum list         > "$OUTDIR/quorum_list.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" quorum dkgstatus    > "$OUTDIR/dkg_status.json" 2>&1 || true
+        tail -500 "{{ item.logdir }}/debug.log" > "$OUTDIR/debug_tail.log" 2>&1 || true
+      args:
+        executable: /bin/bash
+      loop: "{{ pivx_instances }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"
+      changed_when: true
+
+    - name: Collect tc/netem state
+      ansible.builtin.shell: |
+        OUTDIR="{{ _remote_bundle_dir }}/{{ inventory_hostname }}"
+        tc qdisc show > "$OUTDIR/tc_qdisc.txt" 2>&1 || true
+        ip -6 addr show > "$OUTDIR/ipv6_addrs.txt" 2>&1 || true
+        ip route show > "$OUTDIR/routes.txt" 2>&1 || true
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Collect systemd unit status
+      ansible.builtin.shell: |
+        OUTDIR="{{ _remote_bundle_dir }}/{{ inventory_hostname }}"
+        systemctl status 'pivxd@*.service' > "$OUTDIR/systemd_status.txt" 2>&1 || true
+        journalctl -u 'pivxd@*.service' --since "1 hour ago" > "$OUTDIR/journal_1h.txt" 2>&1 || true
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Archive bundle
+      community.general.archive:
+        path: "{{ _remote_bundle_dir }}/{{ inventory_hostname }}"
+        dest: "/tmp/pivx_debug_{{ inventory_hostname }}_{{ _bundle_ts }}.tar.gz"
+        format: gz
+
+    - name: Fetch bundle to controller
+      ansible.builtin.fetch:
+        src: "/tmp/pivx_debug_{{ inventory_hostname }}_{{ _bundle_ts }}.tar.gz"
+        dest: "{{ debug_bundle_local_dir }}/{{ _bundle_ts }}/"
+        flat: true
+
+    - name: Clean up remote staging
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ _remote_bundle_dir }}"
+        - "/tmp/pivx_debug_{{ inventory_hostname }}_{{ _bundle_ts }}.tar.gz"
+
+  post_tasks:
+    - name: Show collection summary
+      ansible.builtin.debug:
+        msg: "Debug bundle collected to: {{ debug_bundle_local_dir }}/{{ _bundle_ts }}/"
+      run_once: true

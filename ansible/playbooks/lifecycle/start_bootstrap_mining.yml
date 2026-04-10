@@ -1,0 +1,51 @@
+---
+# playbooks/lifecycle/start_bootstrap_mining.yml
+#
+# Starts CPU mining on all bootstrap_miner hosts.
+#
+# WHEN TO RUN:
+#   - After fresh chain wipe + deploy-pivx completes
+#   - lifecyle_phase must be `bootstrap_mining` in group_vars
+#
+# WHAT IT DOES:
+#   1. Verifies each mining instance's pivxd is running
+#   2. Calls `setgenerate true <threads>` via RPC on each instance
+#   3. Prints mining status and current block heights
+#
+# PREREQUISITES:
+#   - bootstrap_mining_address must be set in each miner's host_vars
+#   - pivxd instances must already be running (make deploy-pivx first)
+#   - lifecycle_phase=bootstrap_mining in group_vars/all/main.yml
+#
+# Usage:
+#   make start-bootstrap-mining
+#   ansible-playbook -i ansible/inventories/testnet6 ansible/playbooks/lifecycle/start_bootstrap_mining.yml
+
+- name: "PHASE 2 — Start bootstrap mining"
+  hosts: bootstrap_miners
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Verify lifecycle_phase is bootstrap_mining
+      ansible.builtin.fail:
+        msg: >
+          lifecycle_phase is '{{ lifecycle_phase }}' but must be 'bootstrap_mining'.
+          Update group_vars/all/main.yml and re-run.
+      when: lifecycle_phase != 'bootstrap_mining'
+
+    - name: Verify instances are running
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - "pivxd@{{ item.name }}.service"
+      loop: "{{ pivx_instances | selectattr('enabled', 'equalto', true) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: svc_check
+      changed_when: false
+      failed_when: svc_check.rc != 0
+
+  roles:
+    - role: pivx_bootstrap_miner

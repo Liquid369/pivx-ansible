@@ -1,0 +1,11 @@
+# group_vars/observers.yml
+
+node_role: observer
+
+pivx_instances_expected: 1
+
+# Observer watches the network but is not a masternode
+pivx_extra_conf:
+  - "listen=1"
+  - "maxconnections=64"
+  - "txindex=1"        # full tx index for debug queries

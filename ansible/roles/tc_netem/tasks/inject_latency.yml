@@ -1,0 +1,61 @@
+---
+# roles/tc_netem/tasks/inject_latency.yml
+#
+# Injects packet delay + jitter on the host's primary network interface.
+#
+# How it works:
+#   tc qdisc add dev <iface> root netem delay <ms> <jitter> <correlation>
+#
+# To clear: run clear.yml or `make chaos-clear`
+# To override: pass extra vars at playbook invocation:
+#   -e "netem_latency=200ms netem_jitter=20ms"
+
+- name: Resolve primary interface when netem_interface=auto
+  ansible.builtin.shell:
+    cmd: "ip route show default | awk '/default/ {print $5}' | head -1"
+  register: default_iface_result
+  changed_when: false
+  when: netem_interface == 'auto'
+
+- name: Set resolved interface fact
+  ansible.builtin.set_fact:
+    _netem_iface: "{{ default_iface_result.stdout | trim if netem_interface == 'auto' else netem_interface }}"
+
+- name: Fail if no interface found
+  ansible.builtin.fail:
+    msg: "Could not determine network interface. Set netem_interface explicitly."
+  when: _netem_iface | length == 0
+
+- name: Show target interface and parameters
+  ansible.builtin.debug:
+    msg: >
+      Injecting latency on {{ inventory_hostname }}:
+      iface={{ _netem_iface }}
+      delay={{ netem_latency }}
+      jitter={{ netem_jitter }}
+      correlation={{ netem_correlation }}
+
+- name: Clear any existing root qdisc first (idempotent)
+  ansible.builtin.command:
+    cmd: "tc qdisc del dev {{ _netem_iface }} root"
+  register: tc_del_result
+  changed_when: tc_del_result.rc == 0
+  failed_when: false   # ignore if no qdisc exists
+
+- name: Apply netem latency qdisc
+  ansible.builtin.command:
+    cmd: >
+      tc qdisc add dev {{ _netem_iface }} root netem
+      delay {{ netem_latency }} {{ netem_jitter }} {{ netem_correlation }}
+  changed_when: true
+  register: tc_add_result
+
+- name: Verify netem is applied
+  ansible.builtin.command:
+    cmd: "tc qdisc show dev {{ _netem_iface }}"
+  register: tc_show
+  changed_when: false
+
+- name: Show active tc qdiscs
+  ansible.builtin.debug:
+    msg: "{{ tc_show.stdout_lines }}"

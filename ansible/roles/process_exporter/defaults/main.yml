@@ -1,0 +1,23 @@
+---
+# roles/process_exporter/defaults/main.yml
+
+process_exporter_version: "0.7.10"
+process_exporter_port: 9256
+process_exporter_user: process-exporter
+
+# Process name patterns to track.
+# Each entry is a "group" in process-exporter config.
+# pivxd instances are matched by command-line pattern.
+process_exporter_process_names:
+  - name: "pivxd"
+    cmdline:
+      - "pivxd"
+  - name: "tor"
+    cmdline:
+      - "tor"
+  - name: "vector"
+    cmdline:
+      - "vector"
+  - name: "node_exporter"
+    cmdline:
+      - "node_exporter"

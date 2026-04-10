@@ -1,0 +1,21 @@
+---
+# playbooks/deploy_tor.yml
+# Deploy Tor hidden services on all masternode hosts.
+# Must run BEFORE deploy_pivx.yml so onion addresses are available
+# to inject into pivx.conf templates.
+
+- name: Deploy Tor hidden services
+  hosts: masternodes
+  become: true
+  gather_facts: true
+
+  roles:
+    - tor_hidden_service
+
+  post_tasks:
+    - name: Remind operator to update DMN registrations with onion addresses
+      ansible.builtin.debug:
+        msg: >
+          Tor hidden services deployed on {{ inventory_hostname }}.
+          Check the onion addresses printed above and update your
+          DMN registration transactions before starting Tor instances.

@@ -1,0 +1,7 @@
+---
+# roles/vector/handlers/main.yml
+
+- name: restart vector
+  ansible.builtin.service:
+    name: vector
+    state: restarted

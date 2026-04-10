@@ -1,0 +1,11 @@
+# group_vars/all/vault.yml.example
+#
+# COPY THIS FILE to vault.yml and populate real values,
+# then encrypt with: ansible-vault encrypt vault.yml
+#
+# Never commit the real vault.yml — it is .gitignore'd.
+
+vault_pivx_rpc_password: "REPLACE_ME_STRONG_PASSWORD"
+vault_grafana_admin_password: "REPLACE_ME"
+vault_alertmanager_slack_webhook: "https://hooks.slack.com/services/REPLACE_ME"
+vault_ssh_deploy_key_passphrase: ""   # leave blank if key has no passphrase

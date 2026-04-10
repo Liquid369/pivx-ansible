@@ -1,0 +1,39 @@
+---
+# roles/tc_netem/tasks/clear.yml
+#
+# Removes all tc/netem rules from the primary network interface.
+# Safe to run even if no rules are active (no-op if nothing to clear).
+
+- name: Resolve primary interface when netem_interface=auto
+  ansible.builtin.shell:
+    cmd: "ip route show default | awk '/default/ {print $5}' | head -1"
+  register: default_iface_result
+  changed_when: false
+  when: netem_interface == 'auto'
+
+- name: Set resolved interface fact
+  ansible.builtin.set_fact:
+    _netem_iface: "{{ default_iface_result.stdout | trim if netem_interface == 'auto' else netem_interface }}"
+
+- name: Remove root qdisc (clears all tc rules)
+  ansible.builtin.command:
+    cmd: "tc qdisc del dev {{ _netem_iface }} root"
+  register: tc_del_result
+  changed_when: tc_del_result.rc == 0
+  failed_when: false   # rc=2 means no qdisc existed — that is fine
+
+- name: Report clearance result
+  ansible.builtin.debug:
+    msg: >
+      {{ inventory_hostname }}/{{ _netem_iface }}:
+      {{ 'netem rules cleared.' if tc_del_result.rc == 0 else 'No netem rules were active (nothing to clear).' }}
+
+- name: Show current qdisc state
+  ansible.builtin.command:
+    cmd: "tc qdisc show dev {{ _netem_iface }}"
+  register: tc_show
+  changed_when: false
+
+- name: Display qdisc state
+  ansible.builtin.debug:
+    msg: "{{ tc_show.stdout_lines }}"

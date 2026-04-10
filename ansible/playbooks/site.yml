@@ -1,0 +1,17 @@
+---
+# playbooks/site.yml
+# Full environment deployment: bootstrap → PIVX → Tor → monitoring.
+# Run this for a complete bring-up from scratch.
+# For incremental ops, prefer the individual playbooks.
+
+- name: Common OS bootstrap on all hosts
+  import_playbook: bootstrap.yml
+
+- name: Deploy Tor hidden services
+  import_playbook: deploy_tor.yml
+
+- name: Deploy PIVX instances
+  import_playbook: deploy_pivx.yml
+
+- name: Deploy monitoring stack
+  import_playbook: deploy_monitoring.yml

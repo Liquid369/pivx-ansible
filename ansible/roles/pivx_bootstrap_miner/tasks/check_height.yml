@@ -1,0 +1,27 @@
+---
+# roles/pivx_bootstrap_miner/tasks/check_height.yml
+#
+# Polls chain height and reports readiness for PoS transition.
+# Used by verify_phase_readiness.yml playbook.
+
+- name: Get current block height from first available instance
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ (pivx_instances | selectattr('enabled', 'equalto', true) | first).confdir }}/pivx.conf"
+      - "-datadir={{ (pivx_instances | selectattr('enabled', 'equalto', true) | first).datadir }}"
+      - "getblockcount"
+  register: blockcount_result
+  changed_when: false
+  failed_when: blockcount_result.rc != 0
+
+- name: Report current block height
+  ansible.builtin.debug:
+    msg: >
+      {{ inventory_hostname }} block height: {{ blockcount_result.stdout | trim }}
+      / target for PoS: {{ mining_phase_target_height }}
+      — {{ 'READY' if (blockcount_result.stdout | trim | int) >= mining_phase_target_height else 'NOT YET READY' }}
+
+- name: Set height_ready fact
+  ansible.builtin.set_fact:
+    chain_height_ready: "{{ (blockcount_result.stdout | trim | int) >= mining_phase_target_height }}"

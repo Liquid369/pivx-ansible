@@ -1,0 +1,17 @@
+---
+# roles/pivx_masternode/defaults/main.yml
+#
+# Defaults for the pivx_masternode role.
+# This role verifies and activates masternode behavior ON TOP of a deployed
+# pivx_instance. Run pivx_instance first, then pivx_masternode on the same host.
+
+# CLI binary path (should match pivx_instance role)
+pivx_cli_binary: "/opt/pivx/current/bin/pivx-cli"
+
+# How long to wait for RPC to respond after service start (seconds)
+masternode_rpc_wait_retries: 10
+masternode_rpc_wait_delay: 5
+
+# Whether to fail the play if a masternode instance cannot register
+# Set false to warn-only (useful during initial deployment before ProRegTx)
+masternode_fail_on_unregistered: false

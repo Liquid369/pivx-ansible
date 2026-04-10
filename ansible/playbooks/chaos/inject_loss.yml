@@ -1,0 +1,42 @@
+---
+# playbooks/chaos/inject_loss.yml
+#
+# Usage:
+#   make chaos-inject-loss COHORT=tor LOSS=5
+#
+#   ansible-playbook -i ansible/inventories/testnet6 \
+#     ansible/playbooks/chaos/inject_loss.yml \
+#     -e "target_cohort=tor netem_loss_percent=5%"
+#
+# Vars:
+#   netem_loss_percent : e.g. "5%" or "10%"  (default from tc_netem defaults)
+#   netem_interface    : e.g. "eth0"          (default: auto-detect)
+
+- name: Inject packet loss on {{ target_cohort }} cohort hosts
+  hosts: "cohort_{{ target_cohort }}"
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate cohort
+      ansible.builtin.assert:
+        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        msg: "target_cohort must be one of: ipv4, ipv6, tor"
+
+    - name: Log chaos event
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chaos.log
+        line: >-
+          {{ ansible_date_time.iso8601 }} CHAOS inject_loss
+          cohort={{ target_cohort }}
+          loss={{ netem_loss_percent | default('5%') }}
+          host={{ inventory_hostname }}
+        create: true
+        mode: "0640"
+      ignore_errors: true
+
+  tasks:
+    - name: Apply packet loss via tc_netem role
+      ansible.builtin.include_role:
+        name: tc_netem
+        tasks_from: inject_loss.yml

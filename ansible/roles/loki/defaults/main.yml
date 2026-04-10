@@ -1,0 +1,21 @@
+---
+# roles/loki/defaults/main.yml
+
+loki_version: "2.9.4"
+loki_port: 3100
+
+# Retention: how long to keep log data
+# For a testnet lab, 7 days is usually sufficient.
+loki_retention_period: "168h"   # 7 days
+
+# Chunk cache size
+loki_chunk_target_size: 1536000
+
+# Storage paths (created by the role)
+loki_data_dir: /var/lib/loki
+loki_chunks_dir: /var/lib/loki/chunks
+loki_index_dir: /var/lib/loki/index
+loki_wal_dir: /var/lib/loki/wal
+
+# Loki listen address
+loki_listen_address: "0.0.0.0"

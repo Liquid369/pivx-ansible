@@ -1,0 +1,9 @@
+---
+# ansible/requirements.yml
+# Install with: ansible-galaxy collection install -r ansible/requirements.yml
+
+collections:
+  - name: community.general
+    version: ">=8.0"
+  - name: ansible.posix
+    version: ">=1.5"

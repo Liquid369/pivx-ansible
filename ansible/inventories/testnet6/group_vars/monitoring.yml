@@ -1,0 +1,18 @@
+# group_vars/monitoring.yml
+# Applies to the host(s) running the monitoring stack.
+
+monitoring_stack_enabled: true
+
+# Ports for monitoring services
+prometheus_port: 9090
+grafana_port: 3000
+loki_port: 3100
+alertmanager_port: 9093
+
+# Grafana provisioning
+grafana_admin_user: admin
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# Data retention
+prometheus_retention_time: 30d
+loki_retention_period: 720h     # 30 days

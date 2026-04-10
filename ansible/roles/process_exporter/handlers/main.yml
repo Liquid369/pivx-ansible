@@ -1,0 +1,11 @@
+---
+# roles/process_exporter/handlers/main.yml
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart process-exporter
+  ansible.builtin.systemd:
+    name: process-exporter
+    state: restarted

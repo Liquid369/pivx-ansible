@@ -1,0 +1,36 @@
+---
+# playbooks/chaos/stop_provider.yml
+# Stop all PIVX instances on hosts belonging to a provider.
+# Simulates cloud provider outage.
+#
+# Usage:
+#   ansible-playbook ... stop_provider.yml -e "target_provider=contabo"
+
+- name: Stop all PIVX instances on {{ target_provider }} hosts
+  hosts: "provider_{{ target_provider }}"
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Validate target_provider
+      ansible.builtin.assert:
+        that: target_provider in ['contabo', 'ovh']
+        msg: "target_provider must be contabo or ovh"
+
+    - name: Log chaos event
+      ansible.builtin.lineinfile:
+        path: /var/log/pivx/chaos.log
+        line: "{{ ansible_date_time.iso8601 }} CHAOS stop_provider provider={{ target_provider }} host={{ inventory_hostname }}"
+        create: true
+        mode: "0640"
+      ignore_errors: true
+
+  tasks:
+    - name: Stop all PIVX instances
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: stopped
+      loop: "{{ pivx_instances | default([]) }}"
+      when: item.enabled | default(true)
+      loop_control:
+        label: "{{ item.name }}"

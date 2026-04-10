@@ -1,0 +1,42 @@
+# Secrets and credentials
+*vault.yml
+vault_pass.txt
+*.pem
+*.key
+*.p12
+id_rsa
+id_ed25519
+*.secret
+
+# Ansible runtime artifacts
+*.retry
+.ansible_facts_cache/
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.tox/
+
+# Editor artifacts
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs and debug bundles
+debug_bundles/
+*.log
+
+# Terraform state (if added later)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# OS
+Thumbs.db

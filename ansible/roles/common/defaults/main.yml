@@ -1,0 +1,27 @@
+---
+# roles/common/defaults/main.yml
+
+# System user for PIVX daemons
+pivx_user: pivx
+pivx_group: pivx
+
+# NTP servers (chrony)
+chrony_ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  - 2.pool.ntp.org
+  - 3.pool.ntp.org
+
+# UFW: additional allowed inbound ports beyond what roles open
+# Add host-specific ports here if needed.
+ufw_extra_allow_tcp: []
+
+# Log rotation: max age in days for PIVX log files
+pivx_logrotate_days: 14
+
+# Sysctl tuning
+sysctl_net_core_rmem_max: 134217728
+sysctl_net_core_wmem_max: 134217728
+
+# Packages to install on every host
+common_extra_packages: []

@@ -1,0 +1,246 @@
+---
+# playbooks/lifecycle/verify_phase_readiness.yml
+#
+# Polls every PIVX instance in the fleet and prints a readiness summary
+# for the current lifecycle phase.
+#
+# Checks performed:
+#   - pivxd service running per instance
+#   - RPC reachable, getblockchaininfo returns
+#   - Block height vs fleet median (divergence check)
+#   - Peer count vs min_peer_count threshold
+#   - Phase-specific: mining info (Phase 2), staking status (Phase 3),
+#                     masternode ready count (Phase 4)
+#
+# Usage:
+#   make verify-readiness
+#   ansible-playbook -i ansible/inventories/testnet6 \
+#       ansible/playbooks/lifecycle/verify_phase_readiness.yml
+
+- name: "Verify fleet readiness for phase: {{ lifecycle_phase }}"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    pivx_cli: "/opt/pivx/current/bin/pivx-cli"
+
+  tasks:
+    # ------------------------------------------------------------------ #
+    #  Per-host: collect chain info for each enabled instance             #
+    # ------------------------------------------------------------------ #
+    - name: Gather enabled instances
+      ansible.builtin.set_fact:
+        enabled_instances: >-
+          {{ pivx_instances | selectattr('enabled', 'equalto', true) | list }}
+
+    - name: Check service status per instance
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}"
+      loop: "{{ enabled_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: svc_status
+      failed_when: false
+
+    - name: Build service state map
+      ansible.builtin.set_fact:
+        svc_state: >-
+          {{ svc_state | default({}) | combine(
+               { item.item.name: item.status.ActiveState | default('unknown') }
+             ) }}
+      loop: "{{ svc_status.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get blockchaininfo per instance
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_cli }}"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getblockchaininfo"
+      loop: "{{ enabled_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: chaininfo_raw
+      changed_when: false
+      failed_when: false  # collect partial results, report below
+
+    - name: Parse block heights
+      ansible.builtin.set_fact:
+        instance_heights: >-
+          {{ instance_heights | default([]) +
+             [{ 'name': item.item.name,
+                'height': (item.stdout | from_json).blocks | default(-1)
+                           if item.rc == 0 else -1,
+                'headers': (item.stdout | from_json).headers | default(-1)
+                           if item.rc == 0 else -1,
+                'synced': (item.stdout | from_json).verificationprogress | default(0) | float >= 0.9999
+                           if item.rc == 0 else false,
+                'rpc_ok': item.rc == 0 }] }}
+      loop: "{{ chaininfo_raw.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get peer counts per instance
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_cli }}"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getconnectioncount"
+      loop: "{{ enabled_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: peer_counts
+      changed_when: false
+      failed_when: false
+
+    - name: Build peer count map
+      ansible.builtin.set_fact:
+        peer_count_map: >-
+          {{ peer_count_map | default({}) |
+             combine({ item.item.name:
+               (item.stdout | trim | int) if item.rc == 0 else -1 }) }}
+      loop: "{{ peer_counts.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    # ------------------------------------------------------------------ #
+    #  Phase 2: mining info                                               #
+    # ------------------------------------------------------------------ #
+    - name: "[Phase 2] Get mining info per mining instance"
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_cli }}"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getmininginfo"
+      loop: >-
+        {{ enabled_instances | selectattr('mining_enabled', 'defined')
+                              | selectattr('mining_enabled', 'equalto', true)
+                              | list }}
+      loop_control:
+        label: "{{ item.name }}"
+      register: mining_info
+      changed_when: false
+      failed_when: false
+      when: lifecycle_phase == 'bootstrap_mining'
+
+    # ------------------------------------------------------------------ #
+    #  Phase 3: staking status                                            #
+    # ------------------------------------------------------------------ #
+    - name: "[Phase 3] Get staking status per staking instance"
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_cli }}"
+          - "-conf={{ item.confdir }}/pivx.conf"
+          - "-datadir={{ item.datadir }}"
+          - "getstakingstatus"
+      loop: >-
+        {{ enabled_instances | selectattr('staking_enabled', 'defined')
+                              | selectattr('staking_enabled', 'equalto', true)
+                              | list }}
+      loop_control:
+        label: "{{ item.name }}"
+      register: staking_status
+      changed_when: false
+      failed_when: false
+      when: lifecycle_phase == 'staking'
+
+    # ------------------------------------------------------------------ #
+    #  Phase 4: masternode count                                          #
+    # ------------------------------------------------------------------ #
+    - name: "[Phase 4] Get masternode count"
+      ansible.builtin.command:
+        argv:
+          - "{{ pivx_cli }}"
+          - "-conf={{ (enabled_instances | first).confdir }}/pivx.conf"
+          - "-datadir={{ (enabled_instances | first).datadir }}"
+          - "masternode"
+          - "count"
+      register: mn_count
+      changed_when: false
+      failed_when: false
+      when:
+        - lifecycle_phase == 'masternode_quorum'
+        - enabled_instances | length > 0
+
+    # ------------------------------------------------------------------ #
+    #  Print per-host summary                                             #
+    # ------------------------------------------------------------------ #
+    - name: Print per-host readiness table
+      ansible.builtin.debug:
+        msg: |
+          HOST: {{ inventory_hostname }}
+          ┌─────────────────────────────────────────────────────────┐
+          {% for inst in instance_heights | default([]) %}
+          │ {{ '%-20s' | format(inst.name) }}
+          │   service  : {{ svc_state[inst.name] | default('unknown') }}
+          │   rpc      : {{ 'OK' if inst.rpc_ok else 'FAIL' }}
+          │   height   : {{ inst.height }}
+          │   synced   : {{ inst.synced }}
+          │   peers    : {{ peer_count_map[inst.name] | default('?') }}
+          │   peers_ok : {{ (peer_count_map[inst.name] | default(0) | int) >= (min_peer_count | default(2) | int) }}
+          {% endfor %}
+          └─────────────────────────────────────────────────────────┘
+
+# ------------------------------------------------------------------ #
+#  Global summary on localhost                                        #
+# ------------------------------------------------------------------ #
+- name: Global readiness summary
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Aggregate fleet heights from all hosts
+      ansible.builtin.set_fact:
+        all_heights: >-
+          {{ groups['all'] | map('extract', hostvars, 'instance_heights')
+             | select('defined') | flatten | list }}
+
+    - name: Compute height stats
+      ansible.builtin.set_fact:
+        max_height: "{{ all_heights | map(attribute='height') | select('gt', 0) | list | max | default(0) }}"
+        rpc_failures: >-
+          {{ all_heights | selectattr('rpc_ok', 'equalto', false) | map(attribute='name') | list }}
+        behind_instances: >-
+          {{ all_heights | selectattr('rpc_ok', 'equalto', true)
+                        | selectattr('synced', 'equalto', false)
+                        | map(attribute='name') | list }}
+
+    - name: Print global summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          FLEET READINESS SUMMARY — lifecycle_phase={{ lifecycle_phase }}
+          ============================================================
+
+          Max chain height : {{ max_height }}
+          RPC failures     : {{ rpc_failures | join(', ') | default('none') }}
+          Behind/unsynced  : {{ behind_instances | join(', ') | default('none') }}
+
+          {% if lifecycle_phase == 'bootstrap_mining' %}
+          PHASE 2 CHECK:
+            Target height (nFirstPoSBlock) : {{ mining_phase_target_height }}
+            Current max height             : {{ max_height }}
+            {% if max_height | int >= mining_phase_target_height | int %}
+            STATUS: READY to transition to PoS — run: make transition-to-pos
+            {% else %}
+            STATUS: Mining in progress ({{ max_height }}/{{ mining_phase_target_height }})
+            {% endif %}
+          {% endif %}
+
+          {% if lifecycle_phase == 'staking' %}
+          PHASE 3 CHECK:
+            Verify staking wallets are unlocked and funded.
+            If ready for masternodes: make enable-masternodes
+          {% endif %}
+
+          {% if lifecycle_phase == 'masternode_quorum' %}
+          PHASE 4 CHECK:
+            Check quorum DKG: pivx-cli quorum dkgstatus
+            Check LLMQ list:  pivx-cli quorum list
+          {% endif %}
+
+          ============================================================

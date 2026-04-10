@@ -1,0 +1,24 @@
+---
+# roles/alertmanager/defaults/main.yml
+
+alertmanager_version: "0.27.0"
+alertmanager_port: 9093
+
+# Slack webhook URL for alert notifications.
+# Set in vault.yml or as an extra var. Leave REPLACE_ME to disable Slack.
+alertmanager_slack_webhook_url: "REPLACE_ME"
+alertmanager_slack_channel: "#testnet6-alerts"
+
+# Email (optional — leave empty to disable)
+alertmanager_email_to: ""
+alertmanager_email_from: "alertmanager@testnet6.internal"
+alertmanager_smtp_host: ""
+
+# How long to hold off sending repeat alerts for the same firing state
+alertmanager_repeat_interval: "4h"
+
+# Group alerts by these labels
+alertmanager_group_by:
+  - alertname
+  - host
+  - instance

@@ -1,0 +1,20 @@
+# Grafana datasources provisioning
+# /etc/grafana/provisioning/datasources/testnet6.yml
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:{{ prometheus_port }}
+    isDefault: true
+    jsonData:
+      timeInterval: "{{ prometheus_scrape_interval }}"
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://localhost:{{ loki_port }}
+    jsonData:
+      maxLines: 1000
