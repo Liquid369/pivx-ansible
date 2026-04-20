@@ -1,4 +1,4 @@
-# host_vars/tn6-cb4.yml
+# host_vars/tn6-sgp1.yml  — Singapore (KS-5)
 #
 # 6 PIVX masternode instances per host:
 #   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
@@ -10,18 +10,18 @@
 #
 # IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
 
-provider: contabo
-chaos_group: chaos_contabo
-host_label: tn6-cb4
+provider: kimsufi
+chaos_group: chaos_kimsufi
+host_label: tn6-sgp1
 
-host_ipv4:   "203.0.113.14"    # REPLACE_ME
-host_ipv4_2: "203.0.113.114"    # REPLACE_ME  (second public IPv4 / failover IP)
-host_ipv6:   "2001:db8:cb::41"    # REPLACE_ME
-host_ipv6_2: "2001:db8:cb::42"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
+host_ipv4:   "203.0.113.25"    # REPLACE_ME
+host_ipv4_2: "203.0.113.125"    # REPLACE_ME  (second public IPv4 / failover IP)
+host_ipv6:   "2001:db8:ks::61"    # REPLACE_ME
+host_ipv6_2: "2001:db8:ks::62"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
 
 pivx_instances:
 
-  - name: tn6-cb4-v4-mn01
+  - name: tn6-sgp1-v4-mn01
     enabled: true
     slot: 0
     protocol_class: ipv4
@@ -33,16 +33,16 @@ pivx_instances:
     rpc_port: 51478
     rpc_user: rpc_v4mn01
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v4-mn01"
-    logdir: "/var/log/pivx/tn6-cb4-v4-mn01"
-    confdir: "/etc/pivx/tn6-cb4-v4-mn01"
+    datadir: "/var/lib/pivx/tn6-sgp1-v4-mn01"
+    logdir: "/var/log/pivx/tn6-sgp1-v4-mn01"
+    confdir: "/etc/pivx/tn6-sgp1-v4-mn01"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-v4-mn02
+  - name: tn6-sgp1-v4-mn02
     enabled: true
     slot: 1
     protocol_class: ipv4
@@ -54,16 +54,16 @@ pivx_instances:
     rpc_port: 51488
     rpc_user: rpc_v4mn02
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v4-mn02"
-    logdir: "/var/log/pivx/tn6-cb4-v4-mn02"
-    confdir: "/etc/pivx/tn6-cb4-v4-mn02"
+    datadir: "/var/lib/pivx/tn6-sgp1-v4-mn02"
+    logdir: "/var/log/pivx/tn6-sgp1-v4-mn02"
+    confdir: "/etc/pivx/tn6-sgp1-v4-mn02"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-v6-mn03
+  - name: tn6-sgp1-v6-mn03
     enabled: true
     slot: 2
     protocol_class: ipv6
@@ -75,9 +75,9 @@ pivx_instances:
     rpc_port: 51498
     rpc_user: rpc_v6mn03
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v6-mn03"
-    logdir: "/var/log/pivx/tn6-cb4-v6-mn03"
-    confdir: "/etc/pivx/tn6-cb4-v6-mn03"
+    datadir: "/var/lib/pivx/tn6-sgp1-v6-mn03"
+    logdir: "/var/log/pivx/tn6-sgp1-v6-mn03"
+    confdir: "/etc/pivx/tn6-sgp1-v6-mn03"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -86,7 +86,7 @@ pivx_instances:
       - "ipv4=0"
       - "ipv6=1"
 
-  - name: tn6-cb4-v6-mn04
+  - name: tn6-sgp1-v6-mn04
     enabled: true
     slot: 3
     protocol_class: ipv6
@@ -98,9 +98,9 @@ pivx_instances:
     rpc_port: 51508
     rpc_user: rpc_v6mn04
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v6-mn04"
-    logdir: "/var/log/pivx/tn6-cb4-v6-mn04"
-    confdir: "/etc/pivx/tn6-cb4-v6-mn04"
+    datadir: "/var/lib/pivx/tn6-sgp1-v6-mn04"
+    logdir: "/var/log/pivx/tn6-sgp1-v6-mn04"
+    confdir: "/etc/pivx/tn6-sgp1-v6-mn04"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -109,7 +109,7 @@ pivx_instances:
       - "ipv4=0"
       - "ipv6=1"
 
-  - name: tn6-cb4-tor-mn05
+  - name: tn6-sgp1-tor-mn05
     enabled: true
     slot: 4
     protocol_class: tor
@@ -117,15 +117,15 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb4-tor-mn05/hostname
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb4-tor-mn05"
+    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-sgp1-tor-mn05/hostname
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-sgp1-tor-mn05"
     p2p_port: 51514
     rpc_port: 51518
     rpc_user: rpc_tormn05
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-tor-mn05"
-    logdir: "/var/log/pivx/tn6-cb4-tor-mn05"
-    confdir: "/etc/pivx/tn6-cb4-tor-mn05"
+    datadir: "/var/lib/pivx/tn6-sgp1-tor-mn05"
+    logdir: "/var/log/pivx/tn6-sgp1-tor-mn05"
+    confdir: "/etc/pivx/tn6-sgp1-tor-mn05"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -135,7 +135,7 @@ pivx_instances:
       - "proxy=127.0.0.1:9050"
       - "listen=1"
 
-  - name: tn6-cb4-tor-mn06
+  - name: tn6-sgp1-tor-mn06
     enabled: true
     slot: 5
     protocol_class: tor
@@ -143,15 +143,15 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb4-tor-mn06/hostname
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb4-tor-mn06"
+    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-sgp1-tor-mn06/hostname
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-sgp1-tor-mn06"
     p2p_port: 51524
     rpc_port: 51528
     rpc_user: rpc_tormn06
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-tor-mn06"
-    logdir: "/var/log/pivx/tn6-cb4-tor-mn06"
-    confdir: "/etc/pivx/tn6-cb4-tor-mn06"
+    datadir: "/var/lib/pivx/tn6-sgp1-tor-mn06"
+    logdir: "/var/log/pivx/tn6-sgp1-tor-mn06"
+    confdir: "/etc/pivx/tn6-sgp1-tor-mn06"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration

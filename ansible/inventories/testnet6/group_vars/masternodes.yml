@@ -3,10 +3,13 @@
 
 node_role: masternode
 
-# Each masternode host runs 3 PIVX instances: IPv4, IPv6, Tor
+# Each masternode host runs 6 PIVX instances:
+#   2× IPv4  (slots 0-1)
+#   2× IPv6  (slots 2-3)
+#   2× Tor   (slots 4-5)
 # The actual instance definitions live in host_vars per host.
 # This group_var sets the expected count for validation.
-pivx_instances_expected: 3
+pivx_instances_expected: 6
 
 # Lifecycle note:
 #   Phase 2 (bootstrap_mining): MN hosts run instances WITHOUT masternode config.
@@ -18,9 +21,12 @@ pivx_instances_expected: 3
 # Masternode-specific PIVX config (applied only when masternode_enabled=true per instance)
 # This is handled inside the pivx.conf.j2 template — not injected here directly.
 
-# Firewall: open p2p ports for masternode range (slots 0-2)
+# Firewall: open p2p ports for all 6 instance slots
 ufw_pivx_ports:
-  - "{{ pivx_p2p_port_base }}"
-  - "{{ pivx_p2p_port_base + 10 }}"
-  - "{{ pivx_p2p_port_base + 20 }}"
+  - "{{ pivx_p2p_port_base }}"          # slot 0  IPv4 #1  51474
+  - "{{ pivx_p2p_port_base + 10 }}"     # slot 1  IPv4 #2  51484
+  - "{{ pivx_p2p_port_base + 20 }}"     # slot 2  IPv6 #1  51494
+  - "{{ pivx_p2p_port_base + 30 }}"     # slot 3  IPv6 #2  51504
+  - "{{ pivx_p2p_port_base + 40 }}"     # slot 4  Tor  #1  51514
+  - "{{ pivx_p2p_port_base + 50 }}"     # slot 5  Tor  #2  51524
 
