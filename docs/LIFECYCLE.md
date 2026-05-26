@@ -1,30 +1,35 @@
 # PIVX Testnet6 — Testnet Lifecycle Guide
 
-This document describes the five lifecycle phases of the PIVX Testnet6 quorum-testing environment, the preconditions required before each phase transition, and the exact commands needed to execute each transition.
+This document describes the lifecycle phases of the PIVX Testnet6 quorum-testing environment, the preconditions required before each phase transition, and the exact commands needed to execute each transition.
 
 ---
 
 ## Lifecycle Phases
 
 ```
-Phase 1: fresh_chain       — fresh chain deployed, no blocks yet
-Phase 2: bootstrap_mining  — PoW mining to build chain height
-Phase 3: pos_transition    — mining stops; wallets fund staking UTXOs
-Phase 4: staking           — wallets actively staking for block rewards
+Phase 1: fresh_chain       — fresh chain deployed with seed connectivity
+Phase 2: bootstrap_mining  — PoW mining to build height and initial test coins
+Phase 3: pos_transition    — mining stops; staking wallets are funded
+Phase 4: staking           — wallets stake until funds/collateral mature
 Phase 5: masternode_quorum — DMNs registered; LLMQ quorums active
-Phase 6: chaos_testing     — fault injection tests running
+Phase 6: v6_feature_tests  — upgrade/migrate to the selected v6.0 test binary
+Phase 7: chaos_testing     — fault injection tests running
 ```
 
 The `lifecycle_phase` variable in `group_vars/all/main.yml` controls which
 configuration blocks are rendered in `pivx.conf` on the next `make deploy-pivx`.
+The v6 feature-test phase uses the same runtime config as
+`masternode_quorum`; the difference is the upgraded binary under test.
 
 ---
 
-## Phase 1: Fresh Chain Bring-Up
+## Phase 1: Fresh Chain Bring-Up and Seed Mesh
 
 ### What this does
 Deploys the 15 Contabo lab hosts plus `tn6-infra01` from a clean slate: OS packages, pivx user/dirs,
 PIVX 5.6.1 binary, Sapling params, pivx.conf (gen=0), systemd units, Tor, monitoring.
+The first three Contabo hosts also run the seed instances that give the fresh
+network stable initial peer discovery.
 
 ### Preconditions
 - All active hosts reachable via SSH
@@ -47,16 +52,19 @@ make verify-readiness
 ```
 
 ### Expected result
-All instances running, 0 blocks, connected to seed nodes.
-pivx-cli getblockchaininfo → blocks: 0
+All instances are running, the three seeders accept inbound peers, and ordinary
+masternode/observer instances show at least one seed connection. A fresh network
+may still be at `blocks: 0` until bootstrap mining begins.
 
 ---
 
 ## Phase 2: Bootstrap Mining
 
-During Phase 2, tn6-cb1-seed01, tn6-cb2-seed02, and tn6-cb3-seed03 act as CPU miners.
-They mine blocks to build the chain height past `nFirstPoSBlock`
-(set as `mining_phase_target_height` in group_vars, default: 201).
+During Phase 2, `tn6-cb1-seed01`, `tn6-cb2-seed02`, and `tn6-cb3-seed03`
+act as CPU miners. They mine blocks to build the chain height past
+`nFirstPoSBlock` (set as `mining_phase_target_height` in group_vars, default:
+201) and create the first spendable test coins for staking and masternode
+collateral.
 
 Below that height, PIVX testnet uses PoW (CPU mining).
 Above it, PoS becomes valid.
@@ -66,7 +74,7 @@ Above it, PoS becomes valid.
 - `group_vars/all/main.yml`: `lifecycle_phase: bootstrap_mining`
 - `host_vars/tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`:
   - `mining_enabled: true`
-  - `bootstrap_mining_address: "<TESTNET_ADDRESS_WITH_FUNDS>"` (replace!)
+  - `bootstrap_mining_address: "<TESTNET_ADDRESS>"` for the local mining wallet
 - `make deploy-pivx` run to push updated pivx.conf (sets gen=0 on non-miners)
 
 ### Commands
@@ -97,17 +105,22 @@ make verify-readiness
 ```
 STATUS: READY to transition to PoS — run: make transition-to-pos
 ```
+The mining wallets should also hold immature or maturing block rewards. Do not
+assume 201 blocks is enough for the full 90-masternode collateral target; use it
+as the minimum PoS activation threshold, then continue producing/maturing coins
+through staking as needed.
 
 ---
 
-## Phase 3: PoS Transition
+## Phase 3: PoS Transition and Funding
 
-Stops mining, regenerates pivx.conf with `gen=0`, restarts instances.
+Stops mining, regenerates pivx.conf with `gen=0`, restarts instances, and moves
+coin production to wallets that will stake.
 
 ### Preconditions
 - Phase 2 complete: `getblockcount >= mining_phase_target_height` (201)
 - `make verify-readiness` reports READY
-- Staking wallet addresses funded on staking instances (≥1 PIVX per instance for minimal testing)
+- Staking wallet addresses identified for the instances that should create PoS blocks
 
 ### Commands
 ```bash
@@ -126,14 +139,17 @@ make deploy-pivx   # push final gen=0 conf everywhere
 ```
 
 ### Expected result
-All instances running, no mining activity, chain advancing via PoS.
-`getmininginfo` → `networkhashps: 0`
+All instances are running with no PoW mining activity. Once staking wallets are
+funded, unlocked, and mature, the chain should advance through PoS.
+`getmininginfo` should report `networkhashps: 0`.
 
 ---
 
 ## Phase 4: Staking
 
-Instances with `staking_enabled: true` in host_vars actively stake.
+Instances with `staking_enabled: true` in host_vars actively stake. This phase
+is where the network should run long enough to mature staking UTXOs and build
+the collateral needed for the desired masternode count.
 
 ### Preconditions
 - Phase 3 complete
@@ -166,8 +182,9 @@ pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf getstakingstatus
 ```
 
 ### Expected result
-New PoS blocks appearing in chain explorer.
-`getstakingstatus` returns `"staking status": true` on staking instances.
+New PoS blocks appear on the observer and staking nodes. `getstakingstatus`
+returns `"staking status": true` on staking instances. Continue this phase
+until masternode collateral UTXOs have the required confirmations.
 
 ---
 
@@ -186,7 +203,8 @@ This is the target state for quorum failure and resilience tests.
    Fill `bls_operator_key` in `host_vars/<host>.yml` for each masternode instance.
 
 2. **Collateral UTXOs** — 10,000 PIVX testnet per masternode, unspent in the
-   operator wallet. Get testnet coins from the testnet faucet or mine more blocks.
+   operator wallet. Fund these from the bootstrap/staking wallets or any testnet
+   faucet that exists for this chain.
 
 3. **ProRegTx** — register each DMN on-chain using PIVX Core wallet:
    ```
@@ -237,7 +255,39 @@ All DMNs show `"status": "READY"` in `masternode status`.
 
 ---
 
-## Phase 6: Chaos Testing
+## Phase 6: v6.0 Feature Migration
+
+After the seed mesh, staking, and masternode/quorum layers are stable, upgrade
+the fleet to the selected v6.0 test binary and begin feature-specific testing.
+This keeps chain-startup problems separate from migration or new-feature bugs.
+
+### Preconditions
+- Phase 5 is healthy: DMNs are registered, enabled, and quorums are forming
+- PIVX v6.0 test binary URL and SHA256 are known
+- Expected chain parameter changes are documented before rollout
+- Provider snapshots or another rollback option exist for high-risk builds
+
+### Commands
+```bash
+# Edit group_vars/all/main.yml:
+# pivx_version: "6.0.0-test"
+# pivx_archive_url: "<artifact-url>"
+# pivx_checksum: "sha256:<real-sha256>"
+make upgrade-pivx PIVX_VERSION=6.0.0-test
+make status
+make verify-readiness
+```
+
+### Expected result
+All upgraded instances return RPC, remain on the same chain tip, continue
+staking, and keep masternode/quorum status healthy. Feature-specific test cases
+can then run against a known-good network.
+
+See [runbooks/MIGRATE_TO_V6_FEATURES.md](../runbooks/MIGRATE_TO_V6_FEATURES.md).
+
+---
+
+## Phase 7: Chaos Testing
 
 With quorums active, inject network faults to test resilience.
 
@@ -314,6 +364,7 @@ make start-bootstrap-mining
 | Transition             | `pos_transition`            | gen=0 everywhere                     |
 | Staking                | `staking`                  | staking=1 on staking instances       |
 | Masternodes + quorums  | `masternode_quorum`         | masternode=1 + blsprivkey on DMNs    |
+| v6 feature tests       | `masternode_quorum`         | same network state, upgraded binary  |
 | Chaos testing          | `chaos_testing`             | same as masternode_quorum            |
 
 ---
