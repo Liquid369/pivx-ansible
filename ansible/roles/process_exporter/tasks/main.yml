@@ -69,6 +69,13 @@
     - reload systemd
     - restart process-exporter
 
+- name: ufw - allow process-exporter from monitoring host only
+  community.general.ufw:
+    rule: allow
+    src: "{{ hostvars[monitoring_host]['ansible_host'] }}"
+    port: "{{ process_exporter_port }}"
+    proto: tcp
+
 - name: Enable and start process-exporter
   ansible.builtin.systemd:
     name: process-exporter

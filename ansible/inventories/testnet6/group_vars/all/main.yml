@@ -81,6 +81,7 @@ pivx_systemd_service_template: "pivxd@.service"
 # ---------------------------------------------------------------------------
 prometheus_scrape_interval: 30s
 node_exporter_port: 9100
+process_exporter_port: 9256
 vector_port: 8686                # Vector API / metrics port
 
 # Monitoring host — the Prometheus/Grafana/Loki stack target
@@ -140,9 +141,10 @@ chain_wipe_keep_tor_keys: true            # preserve Tor HS private keys across 
 # Both v4 and onion seeds are supported.
 # ---------------------------------------------------------------------------
 pivx_seed_nodes:
-  - "203.0.113.31:51474"     # tn6-seed01 IPv4 — REPLACE
-  - "203.0.113.32:51474"     # tn6-seed02 IPv4 — REPLACE
-  # - "<seed01.onion>:51474" # Add Tor seeds once HS addresses are known
+  - "203.0.113.11:51534"     # tn6-cb1-seed01 IPv4 — REPLACE
+  - "203.0.113.12:51534"     # tn6-cb2-seed02 IPv4 — REPLACE
+  - "203.0.113.13:51534"     # tn6-cb3-seed03 IPv4 — REPLACE
+  # - "<seed01.onion>:51534" # Add Tor seeds once HS addresses are known
 
 # ---------------------------------------------------------------------------
 # Logging labels (common; instances add their own below)

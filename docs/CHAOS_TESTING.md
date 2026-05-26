@@ -48,7 +48,8 @@ make chaos-collect-debug
 
 ### Scenario 1 — Baseline Healthy Mixed Network
 
-**Purpose**: Confirm all 45 instances start, sync, and form quorum correctly.
+**Purpose**: Confirm all 94 active PIVX instances start and sync, and all 90
+masternode instances can form quorum correctly.
 
 **Procedure**:
 1. `make deploy`
@@ -56,13 +57,14 @@ make chaos-collect-debug
 3. Observe Grafana Fleet Overview: all green
 4. Confirm quorum membership: `pivx-cli -conf=... quorum list`
 
-**Expected**: All 45 instances active, quorum forms correctly.
+**Expected**: All 94 instances active, quorum forms correctly across the 90
+masternode instances.
 
 ---
 
 ### Scenario 2 — Single Cohort Outage: Tor
 
-**Hypothesis**: Network remains functional when all 12 Tor instances are stopped.
+**Hypothesis**: Network remains functional when all 30 Tor instances are stopped.
 IPv4 and IPv6 masternodes should sustain quorum if they meet the threshold.
 
 **Procedure**:
@@ -103,8 +105,9 @@ most disruptive single-cohort scenario since seed nodes are IPv4 only.
 
 ### Scenario 5 — Provider Outage: Contabo
 
-**Hypothesis**: Losing all 7 Contabo masternode hosts (21 instances) still
-leaves enough MNs (OVH hosts provide 15 instances) to maintain quorum.
+**Hypothesis**: Losing the active Contabo provider takes down the current
+network. This is a full-provider disaster test for restart and evidence
+collection, not a resilience test until OVH/Kimsufi expansion hosts are added.
 
 **Procedure**:
 1. `make provider-stop PROVIDER=contabo`
@@ -112,18 +115,19 @@ leaves enough MNs (OVH hosts provide 15 instances) to maintain quorum.
 3. Wait 5 minutes
 4. Restore: `make provider-start PROVIDER=contabo`
 
-**Expected**: Degraded but not failed; 15 OVH instances may hit quorum threshold
-depending on configured quorum size.
+**Expected**: Quorum fails while Contabo is stopped. After future OVH/Kimsufi
+hosts are added, this scenario should be updated to test cross-provider
+survivability.
 
 ---
 
 ### Scenario 6 — Seed Node Failure
 
-**Hypothesis**: Loss of both seed nodes does not break existing connections.
+**Hypothesis**: Loss of all three seed instances does not break existing connections.
 New cold-start connections will fail, but established peers maintain.
 
 **Procedure**:
-1. Via SSH, stop PIVX on `tn6-seed01` and `tn6-seed02`
+1. Stop PIVX on `tn6-cb1-seed01`, `tn6-cb2-seed02`, and `tn6-cb3-seed03`
 2. Restart one masternode instance to see if it reconnects
 3. Observe peer counts across fleet
 

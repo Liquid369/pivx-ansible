@@ -11,8 +11,9 @@ Every host has these top-level variables:
 
 | Variable       | Type   | Required | Description |
 |----------------|--------|----------|-------------|
-| `provider`     | string | yes      | `contabo` or `ovh` — must match a `provider_*` group |
-| `chaos_group`  | string | yes      | `chaos_contabo` or `chaos_ovh` — used for provider-level chaos |
+| `provider`     | string | yes      | `contabo` now; `ovh` later — must match a `provider_*` group |
+| `provider_plan`| string | rec      | Contabo plan class such as `contabo_4vcpu` or `contabo_6vcpu` |
+| `chaos_group`  | string | yes      | `chaos_contabo` now; `chaos_ovh` later |
 | `host_label`   | string | yes      | Short human name used in logs and hostnames |
 | `host_ipv4`    | string | yes      | Primary public IPv4 (RFC 5737 placeholder until real IP) |
 | `host_ipv6`    | string | cond     | Public IPv6; required when any instance is `protocol_class: ipv6` |
@@ -52,7 +53,7 @@ Tor instances add:
 ```yaml
     bind_addr: "127.0.0.1"          # Tor binds locally only
     external_ip: ""                 # Left blank; filled after HS creation
-    onion_service_dir: /var/lib/tor/pivx_hs/tn6-cb1-tor-mn03
+    onion_service_dir: /var/lib/tor/pivx_hs/tn6-cb1-tor-mn05
 ```
 
 ### Seeder / Observer differences
@@ -66,12 +67,12 @@ Tor instances add:
 
 | Group               | Membership | Purpose |
 |---------------------|------------|---------|
-| `masternodes`       | 12 hosts   | Hosts with masternode instances |
-| `seeders`           | 2 hosts    | Bootstrap/seed nodes |
+| `masternodes`       | 15 hosts   | Contabo hosts with masternode instances |
+| `seeders`           | 3 hosts    | Colocated bootstrap/seed instances on `tn6-cb1..tn6-cb3` |
 | `observers`         | 1 host     | Observer PIVX node |
 | `monitoring`        | 1 host     | Monitoring stack (shared with observer) |
-| `provider_contabo`  | 9 hosts    | All Contabo-hosted machines |
-| `provider_ovh`      | 6 hosts    | All OVH-hosted machines |
+| `provider_contabo`  | 16 hosts   | 15 Contabo lab hosts + infra |
+| `provider_ovh`      | 0 active   | Future OVH/Kimsufi KS-A expansion group |
 | `cohort_ipv4`       | masternodes + seeders | Hosts with IPv4 instances |
 | `cohort_ipv6`       | masternodes | Hosts with IPv6 instances |
 | `cohort_tor`        | masternodes | Hosts with Tor instances |
@@ -82,15 +83,23 @@ Tor instances add:
 
 ## Port Allocation Summary
 
-| Slot | Protocol | P2P   | RPC   |
-|------|----------|-------|-------|
-| 0    | IPv4     | 51474 | 51478 |
-| 1    | IPv6     | 51484 | 51488 |
-| 2    | Tor      | 51494 | 51498 |
+The active masternode layout uses six slots per host:
 
-Ports are per-host (no cross-host conflicts). The same port numbers are used on
-every masternode host because they bind to distinct IPs (v4/v6 slots) or
-localhost (Tor slot).
+| Slot | Protocol / Role | P2P   | RPC   |
+|------|------------------|-------|-------|
+| 0    | IPv4 MN #1       | 51474 | 51478 |
+| 1    | IPv4 MN #2       | 51484 | 51488 |
+| 2    | IPv6 MN #1       | 51494 | 51498 |
+| 3    | IPv6 MN #2       | 51504 | 51508 |
+| 4    | Tor MN #1        | 51514 | 51518 |
+| 5    | Tor MN #2        | 51524 | 51528 |
+| 6    | Seeder           | 51534 | 51538 |
+
+Slot 6 exists only on `tn6-cb1..tn6-cb3`.
+
+Ports are per-host. The same port numbers are used on every masternode host
+because they bind to distinct IPs, IPv6 addresses, localhost for Tor, or unique
+ports.
 
 ---
 
@@ -125,4 +134,4 @@ It checks:
 - All instance names are globally unique
 - Ports don't conflict within a host
 - Required fields are present
-- `bls_operator_key` is not `REPLACE_ME` if `role == masternode` and `enabled`
+- `bls_operator_key` is not `REPLACE_ME` when `masternode_enabled == true`

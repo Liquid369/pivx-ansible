@@ -1,5 +1,7 @@
 # host_vars/tn6-cb3.yml
 #
+# Active Contabo host for PIVX Testnet6.
+# Plan class: contabo_4vcpu
 # 6 PIVX masternode instances per host:
 #   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
 #   Slot 1  v4-mn02   IPv4 #2   P2P 51484 / RPC 51488
@@ -7,17 +9,35 @@
 #   Slot 3  v6-mn04   IPv6 #2   P2P 51504 / RPC 51508
 #   Slot 4  tor-mn05  Tor  #1   P2P 51514 / RPC 51518
 #   Slot 5  tor-mn06  Tor  #2   P2P 51524 / RPC 51528
+# This host also runs a seeder/bootstrap-miner instance in slot 6.
 #
 # IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
 
 provider: contabo
+provider_plan: contabo_4vcpu
 chaos_group: chaos_contabo
+node_role: mixed_masternode_seeder
 host_label: tn6-cb3
+pivx_instances_expected: 7
 
 host_ipv4:   "203.0.113.13"    # REPLACE_ME
 host_ipv4_2: "203.0.113.113"    # REPLACE_ME  (second public IPv4 / failover IP)
 host_ipv6:   "2001:db8:cb::31"    # REPLACE_ME
 host_ipv6_2: "2001:db8:cb::32"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
+
+# Mining reward address for the colocated bootstrap seeder.
+# Generate with: pivx-cli -testnet getnewaddress "" bech32
+bootstrap_mining_address: "REPLACE_ME"
+
+# Firewall: open all PIVX P2P slots used by this host.
+ufw_pivx_ports:
+  - "{{ pivx_p2p_port_base }}"
+  - "{{ pivx_p2p_port_base + 10 }}"
+  - "{{ pivx_p2p_port_base + 20 }}"
+  - "{{ pivx_p2p_port_base + 30 }}"
+  - "{{ pivx_p2p_port_base + 40 }}"
+  - "{{ pivx_p2p_port_base + 50 }}"
+  - "{{ pivx_p2p_port_base + 60 }}"
 
 pivx_instances:
 
@@ -160,3 +180,28 @@ pivx_instances:
       - "onlynet=onion"
       - "proxy=127.0.0.1:9050"
       - "listen=1"
+
+  - name: tn6-cb3-seed03
+    enabled: true
+    slot: 6
+    protocol_class: ipv4
+    cohort: ipv4
+    role: seeder
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51534
+    rpc_port: 51538
+    rpc_user: rpc_seed03
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb3-seed03"
+    logdir: "/var/log/pivx/tn6-cb3-seed03"
+    confdir: "/etc/pivx/tn6-cb3-seed03"
+    mining_enabled: true         # Phase 2: mine to bootstrap chain
+    staking_enabled: false       # can be flipped true in Phase 3
+    masternode_enabled: false    # seeders are bootstrap peers, not DMNs
+    bls_operator_key: ""
+    extra_conf:
+      - "maxconnections=256"
+      - "listen=1"
+      - "dnsseed=0"
+      - "listenonion=0"

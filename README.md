@@ -2,9 +2,9 @@
 
 Ansible-managed deployment scaffold for the **PIVX Testnet6 quorum testing environment**.
 
-This repository provisions and operates a 15-host, ~45-masternode testnet designed
-specifically for validating deterministic masternode quorum (LLMQ) behavior across mixed
-protocol cohorts: IPv4, IPv6, and Tor.
+This repository provisions and operates the active 15-server Contabo Testnet6
+fleet, with mixed IPv4, IPv6, and Tor masternode cohorts plus three colocated
+seed/bootstrap-miner instances for network startup.
 
 ---
 
@@ -47,26 +47,23 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
 
 ## Host Fleet Summary
 
-| Alias       | Provider | Role(s)          | Instances             |
-|-------------|----------|------------------|-----------------------|
-| tn6-cb1     | Contabo  | masternode       | v4-mn01, v6-mn02, tor-mn03 |
-| tn6-cb2     | Contabo  | masternode       | v4-mn04, v6-mn05, tor-mn06 |
-| tn6-cb3     | Contabo  | masternode       | v4-mn07, v6-mn08, tor-mn09 |
-| tn6-cb4     | Contabo  | masternode       | v4-mn10, v6-mn11, tor-mn12 |
-| tn6-cb5     | Contabo  | masternode       | v4-mn13, v6-mn14, tor-mn15 |
-| tn6-cb6     | Contabo  | masternode       | v4-mn16, v6-mn17, tor-mn18 |
-| tn6-cb7     | Contabo  | masternode       | v4-mn19, v6-mn20, tor-mn21 |
-| tn6-ovh1    | OVH      | masternode       | v4-mn22, v6-mn23, tor-mn24 |
-| tn6-ovh2    | OVH      | masternode       | v4-mn25, v6-mn26, tor-mn27 |
-| tn6-ovh3    | OVH      | masternode       | v4-mn28, v6-mn29, tor-mn30 |
-| tn6-ovh4    | OVH      | masternode       | v4-mn31, v6-mn32, tor-mn33 |
-| tn6-ovh5    | OVH      | masternode       | v4-mn34, v6-mn35, tor-mn36 |
-| tn6-seed01  | Contabo  | seeder/bootstrap | seed01                |
-| tn6-seed02  | OVH      | seeder/bootstrap | seed02                |
-| tn6-infra01 | Contabo  | observer+monitoring | obs01, infra      |
+| Alias range     | Provider | Plan class | Role(s) |
+|-----------------|----------|------------|---------|
+| tn6-cb1..cb3    | Contabo  | 4 vCPU     | 6 masternodes + 1 seeder/bootstrap-miner each |
+| tn6-cb4..cb7    | Contabo  | 4 vCPU     | 6 masternodes each |
+| tn6-cb8..cb15   | Contabo  | 6 vCPU     | 6 masternodes each |
+| tn6-infra01     | Contabo  | small/ops  | observer + monitoring |
 
-45 masternode instances across 12 masternode hosts.
-3 instances per host: 1× IPv4, 1× IPv6, 1× Tor.
+Active fleet totals:
+
+- 15 Contabo masternode servers: 7 smaller 4 vCPU nodes and 8 larger 6 vCPU nodes
+- 90 masternode instances: 30 IPv4, 30 IPv6, 30 Tor
+- 3 colocated seeder/bootstrap-miner instances on `tn6-cb1..tn6-cb3`
+- 1 observer instance on `tn6-infra01`
+
+OVH/Kimsufi KS-A is documented as a future expansion target. The active
+`provider_ovh` inventory group is intentionally empty until those servers are
+purchased.
 
 ---
 
@@ -95,7 +92,7 @@ make bootstrap                          # OS packages, pivx user, firewall rules
 make deploy                             # PIVX binary, configs, Tor, monitoring
 
 # Phase 2: Bootstrap mining (PoW blocks to activate PoS)
-make start-bootstrap-mining             # starts CPU mining on seed01 + seed02
+make start-bootstrap-mining             # starts CPU mining on cb1/cb2/cb3 seeders
 make verify-readiness                   # poll fleet until height >= 201 (nFirstPoSBlock)
 
 # Phase 3: Transition to Proof-of-Stake

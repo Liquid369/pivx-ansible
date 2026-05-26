@@ -1,18 +1,15 @@
 # group_vars/seeders.yml
-# Applies to seed/bootstrap nodes only.
+# Applies to hosts with a seeder/bootstrap instance.
+#
+# In the active Contabo topology, seeders are colocated on tn6-cb1..tn6-cb3,
+# which are also masternode hosts. Avoid defining node_role,
+# pivx_instances_expected, or ufw_pivx_ports here; mixed-purpose hosts set
+# those in host_vars so the masternode ports are not overwritten.
 
-node_role: seeder
-
-# Seeders run a single IPv4 instance + optional IPv6 listener.
-# They do NOT run as masternodes.
-pivx_instances_expected: 1
-
-# Allow many inbound connections - seeders are connection targets
+# Allow many inbound connections for seeder instances. The pivx.conf template
+# also applies role-specific seeder settings when instance.role == "seeder".
 pivx_extra_conf:
   - "listen=1"
   - "maxconnections=256"
   - "dnsseed=0"
   - "listenonion=0"
-
-ufw_pivx_ports:
-  - "{{ pivx_p2p_port_base }}"

@@ -5,7 +5,7 @@
 # Usage:
 #   ansible-playbook ... playbooks/chaos/stop_cohort.yml -e "target_cohort=tor"
 
-- name: Stop {{ target_cohort }} cohort instances
+- name: Stop {{ target_cohort | default('ipv4') }} cohort instances
   hosts: masternodes:seeders
   become: true
   gather_facts: false
@@ -13,25 +13,25 @@
   pre_tasks:
     - name: Validate target_cohort
       ansible.builtin.assert:
-        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        that: (target_cohort | default('ipv4')) in ['ipv4', 'ipv6', 'tor']
         msg: "target_cohort must be one of: ipv4, ipv6, tor"
 
     - name: Log chaos event to Loki (via local file marker)
       ansible.builtin.lineinfile:
         path: /var/log/pivx/chaos.log
         line: >-
-          {{ ansible_date_time.iso8601 }} CHAOS stop_cohort cohort={{ target_cohort }}
+          {{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} CHAOS stop_cohort cohort={{ target_cohort | default('ipv4') }}
           host={{ inventory_hostname }}
         create: true
         mode: "0640"
       ignore_errors: true
 
   tasks:
-    - name: Stop instances in cohort {{ target_cohort }}
+    - name: Stop instances in cohort {{ target_cohort | default('ipv4') }}
       ansible.builtin.systemd:
         name: "pivxd@{{ item.name }}.service"
         state: stopped
-      loop: "{{ pivx_instances | selectattr('cohort', 'equalto', target_cohort) | list }}"
+      loop: "{{ pivx_instances | selectattr('cohort', 'equalto', target_cohort | default('ipv4')) | list }}"
       when: item.enabled | default(true)
       loop_control:
         label: "{{ item.name }}"

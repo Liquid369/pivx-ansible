@@ -1,9 +1,9 @@
 # PIVX Testnet6 — Quickstart
 
-**Audience**: Engineer with root access to 15 Ubuntu 22.04 hosts, basic shell
+**Audience**: Engineer with root access to the active Contabo Ubuntu 22.04 hosts, basic shell
 familiarity, no prior Ansible expertise required.
 
-**Goal**: Get from 15 bare servers to an active PIVX testnet with LLMQ quorums
+**Goal**: Get from 15 Contabo servers to an active PIVX testnet with LLMQ quorums
 running, ready for chaos testing.
 
 Estimated time: 2–4 hours (most time is mining PoW blocks).
@@ -20,14 +20,15 @@ pip3 install ansible ansible-lint
 # Ansible collections
 ansible-galaxy collection install community.general ansible.posix
 
-# SSH key access to all 15 hosts (root or sudo user)
+# SSH key access to the 15 Contabo lab hosts plus tn6-infra01
 ssh-copy-id root@<each-host-ip>
 ```
 
 ### What you need to know about your servers
-- IP address of each of the 15 hosts
+- IP address of each of the 15 Contabo masternode hosts plus `tn6-infra01`
 - SSH user / key
-- Which hosts are Contabo (IPv4), which are OVH (IPv6), and which run Tor
+- Which Contabo hosts are 4 vCPU (`tn6-cb1..tn6-cb7`) versus 6 vCPU (`tn6-cb8..tn6-cb15`)
+- IPv4, extra IPv4, IPv6, and second IPv6 assignments for each host
 
 ---
 
@@ -37,10 +38,18 @@ Open `ansible/inventories/testnet6/host_vars/` — there is one `.yml` file per 
 
 **Find and replace every `REPLACE_ME`** in the following files:
 ```
-host_vars/tn6-seed01.yml    → ansible_host, rpc_password, bootstrap_mining_address
-host_vars/tn6-seed02.yml    → ansible_host, rpc_password, bootstrap_mining_address
-host_vars/tn6-cb1.yml       → ansible_host, rpc_password (bls_operator_key: later)
-... (repeat for all 15 host_vars files)
+host_vars/tn6-cb1.yml       → IPs, bootstrap_mining_address, BLS keys later
+host_vars/tn6-cb2.yml       → IPs, bootstrap_mining_address, BLS keys later
+host_vars/tn6-cb3.yml       → IPs, bootstrap_mining_address, BLS keys later
+host_vars/tn6-cb4..cb15.yml → IPs, BLS keys later
+host_vars/tn6-infra01.yml   → IPs
+```
+Current active seeders are colocated on:
+
+```text
+host_vars/tn6-cb1.yml       → bootstrap_mining_address for tn6-cb1-seed01
+host_vars/tn6-cb2.yml       → bootstrap_mining_address for tn6-cb2-seed02
+host_vars/tn6-cb3.yml       → bootstrap_mining_address for tn6-cb3-seed03
 ```
 
 **IP addresses**: set `ansible_host` in each file.
@@ -50,7 +59,7 @@ host_vars/tn6-cb1.yml       → ansible_host, rpc_password (bls_operator_key: la
 python3 -c "import secrets; print(secrets.token_urlsafe(24))"
 ```
 
-**Mining address** (`bootstrap_mining_address` in seed01/seed02): any valid
+**Mining address** (`bootstrap_mining_address` in cb1/cb2/cb3): any valid
 PIVX testnet address. You can generate one later from the pivx-cli wallet
 after Phase 1 deployment.
 
@@ -100,7 +109,7 @@ This deploys:
 - Prometheus, Grafana, Loki, Alertmanager (on the monitoring host)
 - Vector log shipper on all PIVX hosts
 
-**Expected duration**: ~10–15 minutes for 15 hosts (mostly binary download time).
+**Expected duration**: ~10–15 minutes for the active fleet (mostly binary download time).
 
 ### Verify deployment
 ```bash
@@ -119,11 +128,11 @@ PIVX testnet starts with PoW. You need to mine ~201 blocks before PoS activates.
 ### 4a — Set mining address
 If you skipped it in Step 1, get a testnet mining address now:
 ```bash
-ssh root@<seed01-ip>
-pivx-cli -conf=/etc/pivx/tn6-seed01-instance1/pivx.conf getnewaddress
+ssh root@<tn6-cb1-ip>
+pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf getnewaddress
 ```
-Copy the output address into `host_vars/tn6-seed01.yml` → `bootstrap_mining_address`.
-Do the same for seed02.
+Copy the output address into `host_vars/tn6-cb1.yml` → `bootstrap_mining_address`.
+Do the same for `tn6-cb2.yml` and `tn6-cb3.yml`.
 
 ### 4b — Start mining
 ```bash

@@ -33,6 +33,9 @@ DELAY          ?= 100ms
 JITTER         ?= 10ms
 LOSS           ?= 5
 PIVX_VERSION   ?= latest
+PYTHON         ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
+ANSIBLE_PLAYBOOK ?= $(shell test -x .venv/bin/ansible-playbook && echo .venv/bin/ansible-playbook || echo ansible-playbook)
+ANSIBLE_LINT   ?= $(shell test -x .venv/bin/ansible-lint && echo .venv/bin/ansible-lint || echo ansible-lint)
 
 # Limit flag: pass --limit only when LIMIT is set
 ifdef LIMIT
@@ -41,7 +44,7 @@ else
   LIMIT_FLAG =
 endif
 
-PLAYBOOK = ansible-playbook -i $(INVENTORY) $(ANSIBLE_OPTS) $(LIMIT_FLAG)
+PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(ANSIBLE_OPTS) $(LIMIT_FLAG)
 
 .PHONY: help \
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor \
@@ -96,8 +99,8 @@ help:
 	@echo "  provider-start         Start all services on provider hosts"
 	@echo ""
 	@echo "CHAOS / FAULT INJECTION:"
-	@echo "  chaos-inject-latency COHORT=X [DELAY=100ms] [JITTER=10ms]"
-	@echo "  chaos-inject-loss    COHORT=X [LOSS=5]"
+	@echo "  chaos-inject-latency COHORT=X [DELAY=100ms] [JITTER=10ms]  (host-level netem)"
+	@echo "  chaos-inject-loss    COHORT=X [LOSS=5]                     (host-level netem)"
 	@echo "  chaos-clear          COHORT=X   Remove all netem rules"
 	@echo ""
 	@echo "DAY-2 OPS:"
@@ -173,10 +176,10 @@ status:
 	$(PLAYBOOK) ansible/playbooks/ops/show_status.yml
 
 check-inventory:
-	python3 scripts/validate_inventory.py $(INVENTORY)
+	$(PYTHON) scripts/validate_inventory.py $(INVENTORY)
 
 show-layout:
-	python3 scripts/show_layout.py $(INVENTORY)
+	$(PYTHON) scripts/show_layout.py $(INVENTORY)
 
 # -----------------------------------------------------------------------------
 # Cohort operations
@@ -230,7 +233,7 @@ collect-debug:
 
 ## collect-logs INSTANCE=<name> [FLAGS=--quorum]   - shell-based single-instance log bundle
 collect-logs:
-	@test -n "$(INSTANCE)" || (echo "ERROR: Set INSTANCE=<instance-name>  e.g. make collect-logs INSTANCE=tn6-cb1-tor-mn03"; exit 1)
+	@test -n "$(INSTANCE)" || (echo "ERROR: Set INSTANCE=<instance-name>  e.g. make collect-logs INSTANCE=tn6-cb1-tor-mn05"; exit 1)
 	scripts/collect_logs.sh $(INSTANCE) $(FLAGS)
 
 # Keep old alias for back-compat
@@ -250,4 +253,4 @@ upgrade-pivx:
 # Quality
 # -----------------------------------------------------------------------------
 lint:
-	ansible-lint ansible/playbooks/site.yml
+	XDG_CACHE_HOME=.cache ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_LINT) ansible/playbooks/site.yml

@@ -5,22 +5,23 @@
 #
 # Usage:
 #   ansible-playbook ... stop_provider.yml -e "target_provider=contabo"
+#   ansible-playbook ... stop_provider.yml -e "target_provider=ovh"
 
-- name: Stop all PIVX instances on {{ target_provider }} hosts
-  hosts: "provider_{{ target_provider }}"
+- name: Stop all PIVX instances on {{ target_provider | default('contabo') }} hosts
+  hosts: "provider_{{ target_provider | default('contabo') }}"
   become: true
   gather_facts: false
 
   pre_tasks:
     - name: Validate target_provider
       ansible.builtin.assert:
-        that: target_provider in ['contabo', 'ovh']
+        that: (target_provider | default('contabo')) in ['contabo', 'ovh']
         msg: "target_provider must be contabo or ovh"
 
     - name: Log chaos event
       ansible.builtin.lineinfile:
         path: /var/log/pivx/chaos.log
-        line: "{{ ansible_date_time.iso8601 }} CHAOS stop_provider provider={{ target_provider }} host={{ inventory_hostname }}"
+        line: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} CHAOS stop_provider provider={{ target_provider | default('contabo') }} host={{ inventory_hostname }}"
         create: true
         mode: "0640"
       ignore_errors: true

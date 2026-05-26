@@ -1,5 +1,7 @@
 # host_vars/tn6-cb6.yml
 #
+# Active Contabo host for PIVX Testnet6.
+# Plan class: contabo_4vcpu
 # 6 PIVX masternode instances per host:
 #   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
 #   Slot 1  v4-mn02   IPv4 #2   P2P 51484 / RPC 51488
@@ -11,13 +13,25 @@
 # IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
 
 provider: contabo
+provider_plan: contabo_4vcpu
 chaos_group: chaos_contabo
+node_role: masternode
 host_label: tn6-cb6
+pivx_instances_expected: 6
 
 host_ipv4:   "203.0.113.16"    # REPLACE_ME
 host_ipv4_2: "203.0.113.116"    # REPLACE_ME  (second public IPv4 / failover IP)
 host_ipv6:   "2001:db8:cb::61"    # REPLACE_ME
 host_ipv6_2: "2001:db8:cb::62"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
+
+# Firewall: open all PIVX P2P slots used by this host.
+ufw_pivx_ports:
+  - "{{ pivx_p2p_port_base }}"
+  - "{{ pivx_p2p_port_base + 10 }}"
+  - "{{ pivx_p2p_port_base + 20 }}"
+  - "{{ pivx_p2p_port_base + 30 }}"
+  - "{{ pivx_p2p_port_base + 40 }}"
+  - "{{ pivx_p2p_port_base + 50 }}"
 
 pivx_instances:
 

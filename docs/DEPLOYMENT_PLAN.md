@@ -38,7 +38,7 @@ pip install -r requirements.txt
    chmod 600 vault_pass.txt
    ```
 
-4. **DMN BLS operator keys** — generate BLS keypairs for each of the 36 masternode
+4. **DMN BLS operator keys** — generate BLS keypairs for each of the 90 masternode
    instances. Populate `bls_operator_key` in each instance dict in host_vars.
    DO NOT commit real keys.
 
@@ -50,7 +50,7 @@ pip install -r requirements.txt
 make bootstrap
 ```
 
-This runs `playbooks/bootstrap.yml` on all 15 hosts:
+This runs `playbooks/bootstrap.yml` on the 15 Contabo lab hosts plus `tn6-infra01`:
 - Installs common packages
 - Creates `pivx` user
 - Configures NTP (chrony)
@@ -68,16 +68,16 @@ This runs `playbooks/bootstrap.yml` on all 15 hosts:
 make deploy-tor
 ```
 
-This installs Tor and creates hidden service directories on all 12 masternode
+This installs Tor and creates hidden service directories on all 15 masternode
 hosts. After completion, **onion addresses are printed to stdout**.
 
 **Action required**: Record every onion address. You will need these for your
 DMN registration transactions. The format is:
 ```
-tn6-cb1-tor-mn03: abcdefghijklmnop.onion
+tn6-cb1-tor-mn05: abcdefghijklmnop.onion
 ```
 
-Do NOT proceed with DMN registration until you have all 12 onion addresses.
+Do NOT proceed with DMN registration until you have all 30 onion addresses.
 
 ---
 
@@ -85,7 +85,7 @@ Do NOT proceed with DMN registration until you have all 12 onion addresses.
 
 Using your PIVX v6.0 wallet on a separate machine:
 
-1. Send collateral (10,000 PIVX) for each of the 36 masternode instances
+1. Send collateral (10,000 PIVX) for each of the 90 masternode instances
 2. Register each DMN with `protx register` providing:
    - Collateral txid
    - IPv4 IP:port for IPv4 instances
@@ -122,7 +122,7 @@ Runs in serial batches (5 hosts at a time). For each host:
 make deploy-monitoring
 ```
 
-1. Installs `node_exporter` and `vector` on all 15 hosts
+1. Installs `node_exporter`, `process-exporter`, and `vector` on all active hosts
 2. On `tn6-infra01`: installs Prometheus, Loki, Grafana, Alertmanager
 
 **Verify**:

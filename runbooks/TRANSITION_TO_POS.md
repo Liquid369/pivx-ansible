@@ -28,7 +28,7 @@ and wallets are unlocked.
 - [ ] `getblockcount >= mining_phase_target_height` (201) on all synced nodes
 - [ ] Staking wallet addresses identified on staking instances
 - [ ] Sufficient testnet PIVX on mining nodes to distribute to stakers
-  (check with `pivx-cli getbalance` on seed01/seed02)
+  (check with `pivx-cli getbalance` on cb1/cb2/cb3 seeders)
 
 ---
 
@@ -70,11 +70,11 @@ ssh root@<host>
 pivx-cli -conf=/etc/pivx/<staking-instance>/pivx.conf getnewaddress
 ```
 
-From seed01 (which has mining rewards):
+From the first seeder (which has mining rewards):
 ```bash
-ssh root@<tn6-seed01-ip>
+ssh root@<tn6-cb1-ip>
 # Send to each staking address:
-pivx-cli -conf=/etc/pivx/tn6-seed01-<instance>/pivx.conf \
+pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf \
   sendtoaddress "<staking-address>" 10.0
 ```
 
@@ -132,7 +132,7 @@ make verify-readiness
 Wait for it to report READY.
 
 ### Instance restarts but chain height drops or stalls
-Check that seed nodes are still reachable (they're now PoS-producing nodes too):
+Check that the colocated seed instances are still reachable:
 ```bash
 pivx-cli -conf=/etc/pivx/<instance>/pivx.conf getpeerinfo
 ```

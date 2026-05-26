@@ -7,8 +7,8 @@ variable schema for each host type. Use these as copy-paste starting points.
 
 | File | Host type |
 |------|-----------|
-| `example_masternode_host.yml` | Contabo/OVH host running 3 masternode instances |
-| `example_seed_host.yml` | Seed/bootstrap-miner host |
+| `example_masternode_host.yml` | Contabo host running 6 masternode instances |
+| `example_seed_host.yml` | Seeder/bootstrap-miner instance schema |
 | `example_infra_host.yml` | Monitoring / observer host |
 
 ## Schema quick reference
