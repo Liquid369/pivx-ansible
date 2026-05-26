@@ -45,9 +45,16 @@
     state: started
     enabled: true
 
+- name: Create pivx service group
+  ansible.builtin.group:
+    name: "{{ pivx_group }}"
+    system: true
+    state: present
+
 - name: Create pivx service user
   ansible.builtin.user:
     name: "{{ pivx_user }}"
+    group: "{{ pivx_group }}"
     system: true
     shell: /usr/sbin/nologin
     home: /var/lib/pivx

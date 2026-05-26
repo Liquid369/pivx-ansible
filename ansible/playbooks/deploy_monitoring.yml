@@ -10,6 +10,7 @@
 
   roles:
     - node_exporter
+    - process_exporter
     - vector
 
 - name: Deploy Prometheus, Loki, Grafana, Alertmanager on monitoring host

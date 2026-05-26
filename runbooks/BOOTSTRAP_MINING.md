@@ -11,8 +11,9 @@ to speed up.
 ## Background
 
 PIVX testnet uses a hybrid PoW/PoS model. Before block `nFirstPoSBlock` (~201
-on testnet), only PoW blocks are valid. Two seed nodes (tn6-seed01, tn6-seed02)
-act as CPU miners during this phase via `setgenerate true <threads>`.
+on testnet), only PoW blocks are valid. Three colocated seed instances
+(`tn6-cb1-seed01`, `tn6-cb2-seed02`, and `tn6-cb3-seed03`) act as CPU miners
+during this phase via `setgenerate true <threads>`.
 
 Mining is controlled at two levels:
 1. **pivx.conf** — `gen=1` + `genproclimit=N` persists across restarts
@@ -26,20 +27,21 @@ The `make start-bootstrap-mining` playbook sets both.
 
 - [ ] Phase 1 deployment complete (`make deploy` succeeded on all hosts)
 - [ ] `make status` shows all instances running at height 0
-- [ ] `host_vars/tn6-seed01.yml` and `tn6-seed02.yml`:
+- [ ] `host_vars/tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`:
   - `mining_enabled: true`
   - `bootstrap_mining_address: <valid testnet PIVX address>`
 - [ ] `group_vars/all/main.yml`: `lifecycle_phase: bootstrap_mining`
 
 ### Generating a mining address (if not done yet)
 ```bash
-ssh root@<tn6-seed01-ip>
+ssh root@<tn6-cb1-ip>
 # For the first instance on that host:
-pivx-cli -conf=/etc/pivx/tn6-seed01-<instance-name>/pivx.conf getnewaddress
+pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf getnewaddress
 # Example output: yAbCdEfGhIjKlMnOpQrStUvWxY
 ```
-Copy the address into `host_vars/tn6-seed01.yml` → `bootstrap_mining_address`.
-Repeat for seed02 (can use the same address or a different one).
+Copy the address into `host_vars/tn6-cb1.yml` → `bootstrap_mining_address`.
+Repeat for `tn6-cb2.yml` and `tn6-cb3.yml` (you can use the same address or
+different addresses).
 
 ---
 
@@ -51,7 +53,7 @@ Repeat for seed02 (can use the same address or a different one).
 make deploy-pivx
 ```
 
-This pushes `gen=1` and `genproclimit=1` to seed01/seed02 (because
+This pushes `gen=1` and `genproclimit=1` to cb1/cb2/cb3 seeders (because
 `lifecycle_phase=bootstrap_mining` and `mining_enabled=true` on their instances).
 All other instances get `gen=0`.
 
@@ -65,14 +67,14 @@ This runs `setgenerate true 1` via RPC on all mining instances.
 Expected output per instance:
 ```
 TASK [pivx_bootstrap_miner : Start CPU mining] ***
-ok: [tn6-seed01] => {"changed": false, "rc": 0, ...}
+ok: [tn6-cb1] => {"changed": false, "rc": 0, ...}
 ```
 
 ### Step 3 — Verify mining is active
 
 ```bash
-# On the seed01 host:
-ssh root@<tn6-seed01-ip>
+# On the first seeder host:
+ssh root@<tn6-cb1-ip>
 pivx-cli -conf=/etc/pivx/<instance>/pivx.conf getmininginfo
 ```
 Expected:
@@ -141,7 +143,7 @@ At difficulty adjustment targets:
 
 ## Verifying Block Propagation
 
-Once blocks are being mined on seed01/seed02, verify they propagate to all nodes:
+Once blocks are being mined on cb1/cb2/cb3 seeders, verify they propagate to all nodes:
 ```bash
 make verify-readiness
 ```

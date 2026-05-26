@@ -17,23 +17,31 @@
 # NOTE: netem rules apply to ALL traffic on the interface, not just PIVX p2p.
 # This is intentional for realistic network simulation.
 
-- name: Inject network latency on {{ target_cohort }} cohort hosts
-  hosts: "cohort_{{ target_cohort }}"
+- name: Inject network latency on {{ target_cohort | default('ipv4') }} cohort hosts
+  hosts: "cohort_{{ target_cohort | default('ipv4') }}"
   become: true
   gather_facts: true
 
   pre_tasks:
     - name: Validate cohort
       ansible.builtin.assert:
-        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        that: (target_cohort | default('ipv4')) in ['ipv4', 'ipv6', 'tor']
         msg: "target_cohort must be one of: ipv4, ipv6, tor"
+
+    - name: Warn about host-level netem scope
+      ansible.builtin.debug:
+        msg: >
+          netem is applied to the selected hosts' primary network interface.
+          Because Testnet6 hosts are mixed-protocol, this affects all traffic on
+          these hosts, not only {{ target_cohort | default('ipv4') }} PIVX instances. Use
+          cohort-stop/cohort-start for precise protocol isolation.
 
     - name: Log chaos event
       ansible.builtin.lineinfile:
         path: /var/log/pivx/chaos.log
         line: >-
-          {{ ansible_date_time.iso8601 }} CHAOS inject_latency
-          cohort={{ target_cohort }}
+          {{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} CHAOS inject_latency
+          cohort={{ target_cohort | default('ipv4') }}
           latency={{ netem_latency | default('100ms') }}
           jitter={{ netem_jitter | default('10ms') }}
           host={{ inventory_hostname }}

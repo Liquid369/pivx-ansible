@@ -53,7 +53,7 @@ are confirmed or changed.
 |------------|-----------|------|
 | No PIVX-specific Prometheus exporter exists yet | Not found in PIVX ecosystem | Prometheus alerts marked `PLACEHOLDER` require a PIVX exporter or script-based scraper. **High priority item.** |
 | Vector 0.37+ provides a working journald source | Tested in Vector docs | Vector journald on Ubuntu 22.04 requires `systemd-journal-gateway` or direct privileged access. Confirm vector group membership includes `systemd-journal`. |
-| Loki can handle 15-host × 3-instance label cardinality | 45 unique `instance` values | This is well within Loki's default cardinality limits. |
+| Loki can handle 15-host × 6-instance label cardinality plus seeders and observer | 94 active PIVX `instance` values | This is still well within Loki's default cardinality limits. |
 
 ---
 

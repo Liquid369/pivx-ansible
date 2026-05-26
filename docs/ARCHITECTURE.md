@@ -2,192 +2,154 @@
 
 ## Purpose
 
-This environment exists to test **LLMQ quorum formation and resilience** as
-implemented in PIVX v6.0. It is not a public testnet; it is a controlled,
-instrumented lab for the core team.
+This environment exists to test PIVX v6.0-era staking, deterministic
+masternodes, and LLMQ quorum behavior under controlled failure scenarios. It is
+not a public testnet; it is an instrumented lab for repeatable network creation,
+startup, shutdown, cohort isolation, and evidence collection.
 
 The primary research question is:
 
-> Does the quorum formation algorithm behave correctly — and does the network
-> remain functional — when up to one full protocol cohort or one provider subset
-> is unavailable?
+> Does the network continue to form and maintain quorums when protocol cohorts,
+> provider groups, or selected host subsets are degraded or unavailable?
 
 ---
 
-## Fleet Design
+## Active Fleet
 
-### 15-Host Fleet
+The active funded topology is Contabo-only:
 
-| Count | Role       | Provider mix |
-|-------|------------|--------------|
-| 7     | Masternode | Contabo      |
-| 5     | Masternode | OVH          |
-| 1     | Seeder     | Contabo      |
-| 1     | Seeder     | OVH          |
-| 1     | Infra/Obs  | Contabo      |
+| Count | Host range | Plan class | Role |
+|-------|------------|------------|------|
+| 7     | `tn6-cb1..tn6-cb7` | Contabo 4 vCPU | Masternode hosts |
+| 8     | `tn6-cb8..tn6-cb15` | Contabo 6 vCPU | Masternode hosts |
+| 3     | `tn6-cb1..tn6-cb3` | colocated | Seeder/bootstrap-miner instances |
+| 1     | `tn6-infra01` | ops | Observer + monitoring |
 
-### Per-Host Composition
+OVH/Kimsufi KS-A is planned as a later expansion. The target is 10-12 hosts at
+first, ideally 15 when budget allows. Until then, `provider_ovh` is present but
+empty in the active inventory.
 
-Each of the 12 masternode hosts runs **3 PIVX instances**:
+---
 
-| Slot | Protocol | Cohort |
-|------|----------|--------|
-| 0    | IPv4     | ipv4   |
-| 1    | IPv6     | ipv6   |
-| 2    | Tor      | tor    |
+## Per-Host Composition
 
-This means 36 masternode instances across 12 hosts, plus 9 additional
-instances for the remaining masternode hosts = **45 total masternode instances**.
+Each masternode host runs six PIVX masternode instances:
 
-Every individual host becomes a microcosm of the full protocol mix. This is a
-deliberate choice — see *Why Mixed Composition* below.
+| Slot | Protocol | Cohort | P2P | RPC |
+|------|----------|--------|-----|-----|
+| 0 | IPv4 | `ipv4` | 51474 | 51478 |
+| 1 | IPv4 | `ipv4` | 51484 | 51488 |
+| 2 | IPv6 | `ipv6` | 51494 | 51498 |
+| 3 | IPv6 | `ipv6` | 51504 | 51508 |
+| 4 | Tor | `tor` | 51514 | 51518 |
+| 5 | Tor | `tor` | 51524 | 51528 |
 
-### Observer Node
+`tn6-cb1`, `tn6-cb2`, and `tn6-cb3` also run one colocated seeder/bootstrap
+instance:
 
-`tn6-infra01` runs a non-masternode PIVX instance with `txindex=1` for full
-transaction lookups. This is the RPC target for debugging and log collection.
-It also hosts the monitoring stack (Prometheus, Loki, Grafana, Alertmanager).
+| Slot | Role | P2P | RPC |
+|------|------|-----|-----|
+| 6 | seeder/bootstrap-miner | 51534 | 51538 |
 
-### Seed Nodes
+This yields 90 masternode instances in the active Contabo fleet: 30 IPv4, 30
+IPv6, and 30 Tor, plus three startup seeders.
 
-`tn6-seed01` (Contabo) and `tn6-seed02` (OVH) are the initial network bootstrap
-targets. Both seed nodes are **not** masternodes. They are listed as `addnode=`
-entries in all PIVX configs.
+---
 
-Having seed nodes on two different providers guards against a single-provider
-outage making it impossible to bootstrap new or restarting nodes.
+## Observer Node
+
+`tn6-infra01` runs a non-masternode PIVX observer instance with `txindex=1`.
+It also hosts Prometheus, Loki, Grafana, and Alertmanager.
+
+The observer is the default RPC target for status checks and debugging, while
+the monitoring stack provides fleet-level metrics and log queries.
+
+---
+
+## Seed Nodes
+
+The startup seeders are colocated on the first three Contabo masternode hosts:
+
+- `tn6-cb1-seed01`
+- `tn6-cb2-seed02`
+- `tn6-cb3-seed03`
+
+During bootstrap mining, these instances mine the initial PoW blocks. After the
+network transitions to PoS, they remain high-connection seed peers. The hosts
+also continue to run their normal masternode instances.
 
 ---
 
 ## Why Mixed Protocol Composition Per Host
 
-### What we chose
+Each host carries every protocol cohort. This keeps provider or host failures
+from being confused with protocol failures. If a provider group is stopped, it
+removes roughly equal fractions of IPv4, IPv6, and Tor masternodes. If a cohort
+is stopped, Ansible filters by per-instance `cohort` and leaves the other local
+instances running.
 
-Each masternode host runs one instance of every protocol (IPv4, IPv6, Tor).
-
-### What we rejected
-
-- *Protocol-only hosts*: assigning e.g. all Contabo hosts to IPv4 and all OVH
-  hosts to IPv6. This would make a provider outage indistinguishable from a
-  protocol cohort outage. The tests would conflate two failure modes.
-
-- *Single-instance hosts*: cleaner isolation but far more hosts needed for the
-  same quorum coverage.
-
-### Why mixed is right
-
-1. **Decoupling provider from protocol**: stopping the full Contabo provider
-   removes 7/15 hosts but preserves roughly equal fractions of each
-   protocol cohort. The experiment remains clean.
-2. **More realistic**: production masternodes will be geographically and
-   operationally diverse even within a single protocol class.
-3. **Fewer hosts needed**: 12 hosts × 3 instances = 36 instances across all
-   three cohorts, without needing 36 separate VPS.
-
----
-
-## Naming Convention
-
-```
-tn6-<provider><id>-<proto>-<role><nn>
-```
-
-| Segment      | Values                        |
-|--------------|-------------------------------|
-| `tn6`        | testnet6 constant prefix      |
-| `cb` / `ovh` | Contabo / OVH provider        |
-| `<id>`       | numeric host sequence         |
-| `v4` / `v6` / `tor` | protocol class         |
-| `mn`         | role (masternode)             |
-| `<nn>`       | global sequence number        |
-
-**Examples:**
-- `tn6-cb1-v4-mn01` — Contabo host 1, IPv4 protocol, first masternode instance
-- `tn6-ovh3-tor-mn30` — OVH host 3, Tor protocol, instance number 30
-- `tn6-seed01` — first seed node (Contabo)
-- `tn6-obs01` — observer node (on infra01)
-
----
-
-## Port Allocation Strategy
-
-Each host runs 3 PIVX instances. Ports are offset by slot × 10:
-
-| Slot | Protocol | P2P Port | RPC Port |
-|------|----------|----------|----------|
-| 0    | IPv4     | 51474    | 51478    |
-| 1    | IPv6     | 51484    | 51488    |
-| 2    | Tor      | 51494    | 51498    |
-
-Port offsets are applied from the base values (`pivx_p2p_port_base`,
-`pivx_rpc_port_base`) defined in `group_vars/all/main.yml`.
-
-All RPC listeners bind to `127.0.0.1` only — no remote RPC access.
+This model trades some per-instance isolation for a much larger quorum lab at a
+reasonable VPS count.
 
 ---
 
 ## Systemd Instance Management
 
-PIVX instances use the systemd template unit pattern: `pivxd@<instance>.service`
+PIVX instances use one systemd service per instance:
+
+```text
+pivxd@<instance>.service
+```
 
 Each instance has its own:
-- `/etc/pivx/<instance>/pivx.conf` — full config
-- `/etc/pivx/<instance>/instance.env` — metadata env vars for Vector
-- `/var/lib/pivx/<instance>/` — blockchain data
-- `/var/log/pivx/<instance>/debug.log` — PIVX debug log
-- `/etc/systemd/system/pivxd@<instance>.service` — dedicated unit file
 
-This means systemd instance templating is superseded per-instance: each service
-file is written individually (not using `%i` substitution) to allow fully
-distinct configs per instance.
+- `/etc/pivx/<instance>/pivx.conf`
+- `/etc/pivx/<instance>/instance.env`
+- `/var/lib/pivx/<instance>/`
+- `/var/log/pivx/<instance>/debug.log`
+
+RPC binds only to `127.0.0.1`.
 
 ---
 
-## Protocol Cohort Design
+## Chaos Model
 
-### Three Cohorts
+The repo supports:
 
-| Cohort | Instances | Purpose |
-|--------|-----------|---------|
-| `ipv4` | 12 (mn) + 2 (seed) | Baseline / most widely supported |
-| `ipv6` | 12 (mn)            | IPv6-only network path testing |
-| `tor`  | 12 (mn)            | Tor hidden service testing, privacy |
+- Cohort stop/start/restart by `cohort: ipv4|ipv6|tor`
+- Provider stop/start by `provider_contabo` and, later, `provider_ovh`
+- Rolling restarts
+- Host-level `tc/netem` latency and packet-loss injection
+- Debug bundle collection after experiments
 
-### Cohort Isolation Tests
-
-- **Stop a cohort**: systemd stop on all instances with matching `cohort=` label
-- **Apply netem to a cohort**: all hosts in that cohort group get tc/netem rules
-- **Partial stop**: stop a provider subset of a cohort (e.g., Contabo IPv6 only)
-
-Cohort groups in Ansible are at the *host* level because netem operates on
-network interfaces, not individual processes. Instance-level cohort logic is
-implemented in playbook task filters (`selectattr('cohort', 'equalto', target)`).
+Important: `tc/netem` is host-interface scoped. On mixed-protocol hosts it
+affects all traffic on the selected hosts, not only one PIVX process. Use
+cohort stop/start for precise protocol-cohort removal.
 
 ---
 
 ## Observability Stack
 
-See [OBSERVABILITY.md](OBSERVABILITY.md) for full detail.
+| Component | Role |
+|-----------|------|
+| Prometheus | Metrics collection |
+| node_exporter | Host OS metrics |
+| process-exporter | Process-level pivxd/tor/vector visibility |
+| Loki | Log aggregation |
+| Vector | Journald log shipper on every host |
+| Grafana | Dashboards and Explore |
+| Alertmanager | Alert routing |
 
-| Component    | Role |
-|--------------|------|
-| Prometheus   | Metrics collection (node_exporter scraped from all hosts) |
-| Grafana      | Dashboards, alert UI |
-| Loki         | Log aggregation |
-| Vector       | Log ship agent on every host |
-| Alertmanager | Alert routing (Slack) |
-
-All labels carry: `host`, `instance`, `provider`, `chain`, `cohort`,
-`protocol_class`, `role`. This allows log/metric queries to be directly
-correlated with quorum membership.
+All logs are labeled with host, provider, role, instance, protocol class,
+cohort, chain, and lifecycle phase.
 
 ---
 
 ## Security Assumptions
 
-- SSH key-based auth only; password auth disabled
-- `deploy` user with sudo for Ansible ops; `pivx` user for services
-- No remote RPC access; all RPC is localhost-only
-- Tor instances bind P2P on localhost, hidden service address resolves outside
-- Grafana/Prometheus/Loki exposed only on localhost or restricted CIDR
-- No private keys, collateral txids, or real IPs committed to git
+- SSH key-based auth only
+- `deploy` user has sudo for Ansible
+- `pivx` user owns daemon data and services
+- PIVX RPC stays localhost-only
+- Real secrets live in Ansible Vault, not git
+- Monitoring should be protected by firewall, tunnel, VPN, or reverse proxy

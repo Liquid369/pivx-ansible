@@ -37,6 +37,20 @@ scrape_configs:
           chain:           "{{ chain }}"
 {% endfor %}
 
+  # process-exporter on all fleet hosts; exposes pivxd/vector/tor process state.
+  - job_name: "process_exporter"
+    static_configs:
+{% for host in groups['all'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ process_exporter_port }}"]
+        labels:
+          instance:        "{{ host }}"
+          host:            "{{ host }}"
+          provider:        "{{ hostvars[host]['provider'] | default('unknown') }}"
+          node_role:       "{{ hostvars[host]['node_role'] | default('unknown') }}"
+          chaos_group:     "{{ hostvars[host]['chaos_group'] | default('unknown') }}"
+          chain:           "{{ chain }}"
+{% endfor %}
+
   # Self-monitoring of Prometheus
   - job_name: "prometheus"
     static_configs:

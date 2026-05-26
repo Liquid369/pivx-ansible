@@ -1,7 +1,7 @@
-# host_vars/tn6-cb1.yml
+# host_vars/tn6-cb11.yml
 #
 # Active Contabo host for PIVX Testnet6.
-# Plan class: contabo_4vcpu
+# Plan class: contabo_6vcpu
 # 6 PIVX masternode instances per host:
 #   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
 #   Slot 1  v4-mn02   IPv4 #2   P2P 51484 / RPC 51488
@@ -9,25 +9,20 @@
 #   Slot 3  v6-mn04   IPv6 #2   P2P 51504 / RPC 51508
 #   Slot 4  tor-mn05  Tor  #1   P2P 51514 / RPC 51518
 #   Slot 5  tor-mn06  Tor  #2   P2P 51524 / RPC 51528
-# This host also runs a seeder/bootstrap-miner instance in slot 6.
 #
 # IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
 
 provider: contabo
-provider_plan: contabo_4vcpu
+provider_plan: contabo_6vcpu
 chaos_group: chaos_contabo
-node_role: mixed_masternode_seeder
-host_label: tn6-cb1
-pivx_instances_expected: 7
+node_role: masternode
+host_label: tn6-cb11
+pivx_instances_expected: 6
 
-host_ipv4:   "203.0.113.11"    # REPLACE_ME
-host_ipv4_2: "203.0.113.111"    # REPLACE_ME  (second public IPv4 / failover IP)
-host_ipv6:   "2001:db8:cb::11"    # REPLACE_ME
-host_ipv6_2: "2001:db8:cb::12"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
-
-# Mining reward address for the colocated bootstrap seeder.
-# Generate with: pivx-cli -testnet getnewaddress "" bech32
-bootstrap_mining_address: "REPLACE_ME"
+host_ipv4:   "203.0.113.21"    # REPLACE_ME
+host_ipv4_2: "203.0.113.121"    # REPLACE_ME  (second public IPv4 / failover IP)
+host_ipv6:   "2001:db8:cb::111"    # REPLACE_ME
+host_ipv6_2: "2001:db8:cb::112"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
 
 # Firewall: open all PIVX P2P slots used by this host.
 ufw_pivx_ports:
@@ -37,11 +32,10 @@ ufw_pivx_ports:
   - "{{ pivx_p2p_port_base + 30 }}"
   - "{{ pivx_p2p_port_base + 40 }}"
   - "{{ pivx_p2p_port_base + 50 }}"
-  - "{{ pivx_p2p_port_base + 60 }}"
 
 pivx_instances:
 
-  - name: tn6-cb1-v4-mn01
+  - name: tn6-cb11-v4-mn01
     enabled: true
     slot: 0
     protocol_class: ipv4
@@ -53,16 +47,16 @@ pivx_instances:
     rpc_port: 51478
     rpc_user: rpc_v4mn01
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-v4-mn01"
-    logdir: "/var/log/pivx/tn6-cb1-v4-mn01"
-    confdir: "/etc/pivx/tn6-cb1-v4-mn01"
+    datadir: "/var/lib/pivx/tn6-cb11-v4-mn01"
+    logdir: "/var/log/pivx/tn6-cb11-v4-mn01"
+    confdir: "/etc/pivx/tn6-cb11-v4-mn01"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb1-v4-mn02
+  - name: tn6-cb11-v4-mn02
     enabled: true
     slot: 1
     protocol_class: ipv4
@@ -74,16 +68,16 @@ pivx_instances:
     rpc_port: 51488
     rpc_user: rpc_v4mn02
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-v4-mn02"
-    logdir: "/var/log/pivx/tn6-cb1-v4-mn02"
-    confdir: "/etc/pivx/tn6-cb1-v4-mn02"
+    datadir: "/var/lib/pivx/tn6-cb11-v4-mn02"
+    logdir: "/var/log/pivx/tn6-cb11-v4-mn02"
+    confdir: "/etc/pivx/tn6-cb11-v4-mn02"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb1-v6-mn03
+  - name: tn6-cb11-v6-mn03
     enabled: true
     slot: 2
     protocol_class: ipv6
@@ -95,9 +89,9 @@ pivx_instances:
     rpc_port: 51498
     rpc_user: rpc_v6mn03
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-v6-mn03"
-    logdir: "/var/log/pivx/tn6-cb1-v6-mn03"
-    confdir: "/etc/pivx/tn6-cb1-v6-mn03"
+    datadir: "/var/lib/pivx/tn6-cb11-v6-mn03"
+    logdir: "/var/log/pivx/tn6-cb11-v6-mn03"
+    confdir: "/etc/pivx/tn6-cb11-v6-mn03"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -106,7 +100,7 @@ pivx_instances:
       - "ipv4=0"
       - "ipv6=1"
 
-  - name: tn6-cb1-v6-mn04
+  - name: tn6-cb11-v6-mn04
     enabled: true
     slot: 3
     protocol_class: ipv6
@@ -118,9 +112,9 @@ pivx_instances:
     rpc_port: 51508
     rpc_user: rpc_v6mn04
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-v6-mn04"
-    logdir: "/var/log/pivx/tn6-cb1-v6-mn04"
-    confdir: "/etc/pivx/tn6-cb1-v6-mn04"
+    datadir: "/var/lib/pivx/tn6-cb11-v6-mn04"
+    logdir: "/var/log/pivx/tn6-cb11-v6-mn04"
+    confdir: "/etc/pivx/tn6-cb11-v6-mn04"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -129,7 +123,7 @@ pivx_instances:
       - "ipv4=0"
       - "ipv6=1"
 
-  - name: tn6-cb1-tor-mn05
+  - name: tn6-cb11-tor-mn05
     enabled: true
     slot: 4
     protocol_class: tor
@@ -137,15 +131,15 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb1-tor-mn05/hostname
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb1-tor-mn05"
+    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb11-tor-mn05/hostname
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb11-tor-mn05"
     p2p_port: 51514
     rpc_port: 51518
     rpc_user: rpc_tormn05
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-tor-mn05"
-    logdir: "/var/log/pivx/tn6-cb1-tor-mn05"
-    confdir: "/etc/pivx/tn6-cb1-tor-mn05"
+    datadir: "/var/lib/pivx/tn6-cb11-tor-mn05"
+    logdir: "/var/log/pivx/tn6-cb11-tor-mn05"
+    confdir: "/etc/pivx/tn6-cb11-tor-mn05"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -155,7 +149,7 @@ pivx_instances:
       - "proxy=127.0.0.1:9050"
       - "listen=1"
 
-  - name: tn6-cb1-tor-mn06
+  - name: tn6-cb11-tor-mn06
     enabled: true
     slot: 5
     protocol_class: tor
@@ -163,15 +157,15 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb1-tor-mn06/hostname
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb1-tor-mn06"
+    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb11-tor-mn06/hostname
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb11-tor-mn06"
     p2p_port: 51524
     rpc_port: 51528
     rpc_user: rpc_tormn06
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-tor-mn06"
-    logdir: "/var/log/pivx/tn6-cb1-tor-mn06"
-    confdir: "/etc/pivx/tn6-cb1-tor-mn06"
+    datadir: "/var/lib/pivx/tn6-cb11-tor-mn06"
+    logdir: "/var/log/pivx/tn6-cb11-tor-mn06"
+    confdir: "/etc/pivx/tn6-cb11-tor-mn06"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
@@ -180,28 +174,3 @@ pivx_instances:
       - "onlynet=onion"
       - "proxy=127.0.0.1:9050"
       - "listen=1"
-
-  - name: tn6-cb1-seed01
-    enabled: true
-    slot: 6
-    protocol_class: ipv4
-    cohort: ipv4
-    role: seeder
-    bind_addr: "{{ host_ipv4 }}"
-    external_ip: "{{ host_ipv4 }}"
-    p2p_port: 51534
-    rpc_port: 51538
-    rpc_user: rpc_seed01
-    rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb1-seed01"
-    logdir: "/var/log/pivx/tn6-cb1-seed01"
-    confdir: "/etc/pivx/tn6-cb1-seed01"
-    mining_enabled: true         # Phase 2: mine to bootstrap chain
-    staking_enabled: false       # can be flipped true in Phase 3
-    masternode_enabled: false    # seeders are bootstrap peers, not DMNs
-    bls_operator_key: ""
-    extra_conf:
-      - "maxconnections=256"
-      - "listen=1"
-      - "dnsseed=0"
-      - "listenonion=0"

@@ -8,8 +8,8 @@
 #   ./scripts/collect_logs.sh <instance-name>
 #   ./scripts/collect_logs.sh <instance-name> --quorum
 #   ./scripts/collect_logs.sh <instance-name> --lines 1000
-#   ./scripts/collect_logs.sh tn6-cb1-tor-mn03
-#   ./scripts/collect_logs.sh tn6-cb1-tor-mn03 --quorum --lines 500
+#   ./scripts/collect_logs.sh tn6-cb1-tor-mn05
+#   ./scripts/collect_logs.sh tn6-cb1-tor-mn05 --quorum --lines 500
 #
 # Requires:
 #   - SSH access to the host via the ansible_host in host_vars
@@ -38,8 +38,8 @@ if [[ -z "$INSTANCE" ]]; then
   echo "Usage: $0 <instance-name> [--quorum] [--lines N]"
   echo ""
   echo "Examples:"
-  echo "  $0 tn6-cb1-tor-mn03"
-  echo "  $0 tn6-seed01 --quorum --lines 1000"
+  echo "  $0 tn6-cb1-tor-mn05"
+  echo "  $0 tn6-cb1-seed01 --quorum --lines 1000"
   exit 1
 fi
 

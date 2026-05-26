@@ -12,23 +12,23 @@
 #
 # To clear ALL cohorts at once: omit target_cohort and set hosts: all
 
-- name: Clear netem rules on {{ target_cohort }} cohort hosts
-  hosts: "cohort_{{ target_cohort }}"
+- name: Clear netem rules on {{ target_cohort | default('ipv4') }} cohort hosts
+  hosts: "cohort_{{ target_cohort | default('ipv4') }}"
   become: true
   gather_facts: true
 
   pre_tasks:
     - name: Validate cohort
       ansible.builtin.assert:
-        that: target_cohort in ['ipv4', 'ipv6', 'tor']
+        that: (target_cohort | default('ipv4')) in ['ipv4', 'ipv6', 'tor']
         msg: "target_cohort must be one of: ipv4, ipv6, tor"
 
     - name: Log chaos event
       ansible.builtin.lineinfile:
         path: /var/log/pivx/chaos.log
         line: >-
-          {{ ansible_date_time.iso8601 }} CHAOS clear_netem
-          cohort={{ target_cohort }}
+          {{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} CHAOS clear_netem
+          cohort={{ target_cohort | default('ipv4') }}
           host={{ inventory_hostname }}
         create: true
         mode: "0640"

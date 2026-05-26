@@ -12,45 +12,13 @@
   roles:
     - pivx_install
 
-- name: Deploy PIVX instances on masternode hosts
-  hosts: masternodes
+- name: Deploy PIVX instances
+  hosts: masternodes:seeders:observers
   become: true
   gather_facts: true
 
   tasks:
     - name: Deploy each PIVX instance
-      ansible.builtin.include_role:
-        name: pivx_instance
-      vars:
-        instance: "{{ item }}"
-      loop: "{{ pivx_instances }}"
-      when: item.enabled | default(true)
-      loop_control:
-        label: "{{ item.name }}"
-
-- name: Deploy PIVX instances on seeder hosts
-  hosts: seeders
-  become: true
-  gather_facts: true
-
-  tasks:
-    - name: Deploy each seeder instance
-      ansible.builtin.include_role:
-        name: pivx_instance
-      vars:
-        instance: "{{ item }}"
-      loop: "{{ pivx_instances }}"
-      when: item.enabled | default(true)
-      loop_control:
-        label: "{{ item.name }}"
-
-- name: Deploy PIVX instances on observer hosts
-  hosts: observers
-  become: true
-  gather_facts: true
-
-  tasks:
-    - name: Deploy observer instance
       ansible.builtin.include_role:
         name: pivx_instance
       vars:

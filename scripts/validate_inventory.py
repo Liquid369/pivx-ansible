@@ -57,6 +57,31 @@ def load_host_vars(inv_dir: Path) -> dict[str, dict]:
     return host_vars
 
 
+def load_inventory_hosts(inv_dir: Path) -> set[str]:
+    """Return all concrete hostnames declared under hosts.yml children."""
+    hosts_file = inv_dir / "hosts.yml"
+    if not hosts_file.exists():
+        err(f"Inventory hosts.yml not found: {hosts_file}")
+        return set()
+
+    data = load_yaml(hosts_file)
+    found: set[str] = set()
+
+    def walk(node):
+        if not isinstance(node, dict):
+            return
+        hosts = node.get("hosts", {})
+        if isinstance(hosts, dict):
+            found.update(hosts.keys())
+        children = node.get("children", {})
+        if isinstance(children, dict):
+            for child in children.values():
+                walk(child)
+
+    walk(data.get("all", data))
+    return found
+
+
 def validate_instances(all_host_vars: dict[str, dict]):
     seen_names: set[str] = set()
     seen_ports: dict[str, set[tuple]] = defaultdict(set)  # host -> {(port,proto)}
@@ -66,6 +91,13 @@ def validate_instances(all_host_vars: dict[str, dict]):
         if not instances:
             # Hosts without instances (monitoring-only) are OK
             continue
+
+        expected = hvars.get("pivx_instances_expected")
+        if expected is not None and len([i for i in instances if i.get("enabled", True)]) != int(expected):
+            err(
+                f"{hostname}: pivx_instances_expected={expected} but "
+                f"{len([i for i in instances if i.get('enabled', True)])} enabled instances found"
+            )
 
         for inst in instances:
             name = inst.get("name", "UNNAMED")
@@ -98,8 +130,9 @@ def validate_instances(all_host_vars: dict[str, dict]):
             # BLS key placeholder check
             role = inst.get("role", "")
             bls = inst.get("bls_operator_key", "")
-            if role == "masternode" and enabled and bls in ("REPLACE_ME", "", None):
-                warn(f"{hostname}/{name}: bls_operator_key is unset/placeholder (must be filled before deploy)")
+            mn_enabled = inst.get("masternode_enabled", False)
+            if role == "masternode" and enabled and mn_enabled and bls in ("REPLACE_ME", "", None):
+                err(f"{hostname}/{name}: masternode_enabled=true but bls_operator_key is unset/placeholder")
 
             # IPv6 requires host_ipv6
             proto = inst.get("protocol_class", "")
@@ -125,6 +158,17 @@ def validate_placeholder_ips(all_host_vars: dict[str, dict]):
                 warn(f"{hostname}: {field}='{val}' looks like a placeholder — replace with real IP")
 
 
+def validate_host_vars_match_inventory(inv_hosts: set[str], all_host_vars: dict[str, dict]):
+    hv_hosts = set(all_host_vars.keys())
+    missing_hv = sorted(inv_hosts - hv_hosts)
+    extra_hv = sorted(hv_hosts - inv_hosts)
+
+    for host in missing_hv:
+        err(f"{host}: present in hosts.yml but missing host_vars/{host}.yml")
+    for host in extra_hv:
+        warn(f"{host}: host_vars file exists but host is not active in hosts.yml")
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: validate_inventory.py <inventory_dir>")
@@ -137,9 +181,12 @@ def main():
 
     print(f"\nValidating inventory: {inv_dir}\n")
 
+    inv_hosts = load_inventory_hosts(inv_dir)
     all_host_vars = load_host_vars(inv_dir)
+    print(f"Loaded {len(inv_hosts)} active inventory hosts: {sorted(inv_hosts)}\n")
     print(f"Loaded host_vars for {len(all_host_vars)} hosts: {sorted(all_host_vars.keys())}\n")
 
+    validate_host_vars_match_inventory(inv_hosts, all_host_vars)
     validate_instances(all_host_vars)
     validate_placeholder_ips(all_host_vars)
 

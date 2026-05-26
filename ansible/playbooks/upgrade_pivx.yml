@@ -61,7 +61,7 @@
     - name: Record upgrade in upgrade log
       ansible.builtin.lineinfile:
         path: /var/log/pivx/upgrade.log
-        line: "{{ ansible_date_time.iso8601 }} upgraded to {{ pivx_version }} on {{ inventory_hostname }}"
+        line: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} upgraded to {{ pivx_version }} on {{ inventory_hostname }}"
         create: true
         mode: "0640"
         owner: "{{ pivx_user }}"

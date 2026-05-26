@@ -1,10 +1,16 @@
 ---
 # playbooks/chaos/start_provider.yml
 
-- name: Start all PIVX instances on {{ target_provider }} hosts
-  hosts: "provider_{{ target_provider }}"
+- name: Start all PIVX instances on {{ target_provider | default('contabo') }} hosts
+  hosts: "provider_{{ target_provider | default('contabo') }}"
   become: true
   gather_facts: false
+
+  pre_tasks:
+    - name: Validate target_provider
+      ansible.builtin.assert:
+        that: (target_provider | default('contabo')) in ['contabo', 'ovh']
+        msg: "target_provider must be contabo or ovh"
 
   tasks:
     - name: Start all PIVX instances
@@ -19,7 +25,7 @@
     - name: Log chaos event
       ansible.builtin.lineinfile:
         path: /var/log/pivx/chaos.log
-        line: "{{ ansible_date_time.iso8601 }} CHAOS start_provider provider={{ target_provider }} host={{ inventory_hostname }}"
+        line: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }} CHAOS start_provider provider={{ target_provider | default('contabo') }} host={{ inventory_hostname }}"
         create: true
         mode: "0640"
       ignore_errors: true

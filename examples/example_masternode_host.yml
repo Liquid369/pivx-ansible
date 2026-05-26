@@ -1,7 +1,7 @@
 ---
 # examples/example_masternode_host.yml
 #
-# Example host_vars file for a Contabo or KS-5 host running 6 masternode instances:
+# Example host_vars file for a Contabo host running 6 masternode instances:
 #   Slot 0  v4-mn01  IPv4 #1   P2P 51474 / RPC 51478
 #   Slot 1  v4-mn02  IPv4 #2   P2P 51484 / RPC 51488
 #   Slot 2  v6-mn03  IPv6 #1   P2P 51494 / RPC 51498
@@ -12,8 +12,9 @@
 # Copy this to host_vars/<hostname>.yml and replace all REPLACE_ME values.
 # The generated stubs in host_vars/ already follow this layout.
 
-provider: contabo              # contabo | kimsufi
-chaos_group: chaos_contabo     # chaos_contabo | chaos_kimsufi
+provider: contabo
+provider_plan: contabo_4vcpu   # contabo_4vcpu | contabo_6vcpu
+chaos_group: chaos_contabo
 host_label: tn6-cb1            # REPLACE: actual hostname
 
 host_ipv4:   "203.0.113.10"   # REPLACE: first public IPv4

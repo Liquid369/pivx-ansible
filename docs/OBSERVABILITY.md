@@ -49,7 +49,7 @@ Every metric and log line carries these labels:
 
 | Label           | Source      | Values |
 |-----------------|-------------|--------|
-| `host`          | host_vars   | `tn6-cb1`, `tn6-ovh3`, … |
+| `host`          | host_vars   | `tn6-cb1`, `tn6-cb15`, … |
 | `instance`      | instance.name | `tn6-cb1-v4-mn01`, … |
 | `provider`      | host_vars   | `contabo`, `ovh` |
 | `chain`         | group_vars  | `testnet6` |
@@ -134,10 +134,12 @@ All standard node_exporter metrics are available. Particularly useful:
 - `node_network_receive_bytes_total` / `_transmit_bytes_total` — traffic
 - `node_netstat_Tcp_CurrEstab` — open TCP connections
 
-### Future: PIVX process exporter
+### Process metrics and future PIVX RPC exporter
 
-A PIVX-specific exporter (or process_exporter with a PIVX scraper) should be
-added to expose:
+`process-exporter` is deployed to expose process-level visibility for `pivxd`,
+Tor, Vector, and node_exporter.
+
+A PIVX-specific RPC exporter should still be added to expose:
 - Block height per instance
 - Peer count per instance
 - Quorum membership status

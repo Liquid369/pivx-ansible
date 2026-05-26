@@ -16,10 +16,10 @@ make collect-debug
 make collect-debug LIMIT=tn6-cb1
 
 # Collect recent logs for a specific instance by name
-scripts/collect_logs.sh tn6-cb1-tor-mn03
+scripts/collect_logs.sh tn6-cb1-tor-mn05
 
 # Collect logs from a failing Tor instance + print quorum status
-scripts/collect_logs.sh tn6-cb1-tor-mn03 --quorum
+scripts/collect_logs.sh tn6-cb1-tor-mn05 --quorum
 ```
 
 ---
@@ -61,7 +61,7 @@ make collect-debug LIMIT=<hostname>
 # Via script (faster, just logs for one instance)
 scripts/collect_logs.sh <instance-name>
 # e.g.:
-scripts/collect_logs.sh tn6-cb1-tor-mn03
+scripts/collect_logs.sh tn6-cb1-tor-mn05
 ```
 
 The script creates `debug-bundles/<instance-name>-<timestamp>/` locally.
@@ -71,18 +71,18 @@ The script creates `debug-bundles/<instance-name>-<timestamp>/` locally.
 ```bash
 # Direct on the host:
 ssh root@<host-ip>
-journalctl -u pivxd@tn6-cb1-tor-mn03 -n 200 --no-pager
+journalctl -u pivxd@tn6-cb1-tor-mn05 -n 200 --no-pager
 
 # Most useful patterns to look for:
-journalctl -u pivxd@tn6-cb1-tor-mn03 --no-pager | grep -E "ERROR|WARN|Masternode|quorum|DKG"
+journalctl -u pivxd@tn6-cb1-tor-mn05 --no-pager | grep -E "ERROR|WARN|Masternode|quorum|DKG"
 ```
 
 ### Step 4 — Check chain state
 
 ```bash
 ssh root@<host-ip>
-CONF=/etc/pivx/tn6-cb1-tor-mn03/pivx.conf
-DATA=/var/lib/pivx/tn6-cb1-tor-mn03
+CONF=/etc/pivx/tn6-cb1-tor-mn05/pivx.conf
+DATA=/var/lib/pivx/tn6-cb1-tor-mn05
 
 # Block height and sync
 pivx-cli -conf=$CONF -datadir=$DATA getblockchaininfo
@@ -103,7 +103,7 @@ pivx-cli -conf=$CONF -datadir=$DATA quorum dkgstatus
 ssh root@<host-ip>
 # Verify Tor is running and hidden service is up
 systemctl status tor
-cat /var/lib/tor/tn6-cb1-tor-mn03/hostname
+cat /var/lib/tor/tn6-cb1-tor-mn05/hostname
 # → should show .onion address
 
 # Check Tor logs
@@ -118,7 +118,7 @@ Log queries to use in Grafana → Explore → Loki:
 
 ```logql
 # All logs for one instance
-{job="pivxd", instance="tn6-cb1-tor-mn03"}
+{job="pivxd", instance="tn6-cb1-tor-mn05"}
 
 # ERROR and WARN lines across the fleet
 {job="pivxd"} |= "ERROR"

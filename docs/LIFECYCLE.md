@@ -23,14 +23,14 @@ configuration blocks are rendered in `pivx.conf` on the next `make deploy-pivx`.
 ## Phase 1: Fresh Chain Bring-Up
 
 ### What this does
-Deploys all 15 hosts from a clean slate: OS packages, pivx user/dirs,
+Deploys the 15 Contabo lab hosts plus `tn6-infra01` from a clean slate: OS packages, pivx user/dirs,
 PIVX 5.6.1 binary, Sapling params, pivx.conf (gen=0), systemd units, Tor, monitoring.
 
 ### Preconditions
-- All 15 hosts reachable via SSH
+- All active hosts reachable via SSH
 - `host_vars/*.yml` filled in (see `REVIEW.md` for REPLACE_ME checklist)
   - `rpc_password` set per instance
-  - `bootstrap_mining_address` set in seed01/seed02 host_vars
+  - `bootstrap_mining_address` set in cb1/cb2/cb3 seeders host_vars
 - SSH public key deployed on all hosts
 
 ### Commands
@@ -54,7 +54,7 @@ pivx-cli getblockchaininfo → blocks: 0
 
 ## Phase 2: Bootstrap Mining
 
-During Phase 2, tn6-seed01 and tn6-seed02 act as CPU miners.
+During Phase 2, tn6-cb1-seed01, tn6-cb2-seed02, and tn6-cb3-seed03 act as CPU miners.
 They mine blocks to build the chain height past `nFirstPoSBlock`
 (set as `mining_phase_target_height` in group_vars, default: 201).
 
@@ -64,7 +64,7 @@ Above it, PoS becomes valid.
 ### Preconditions
 - Phase 1 complete, fleet healthy
 - `group_vars/all/main.yml`: `lifecycle_phase: bootstrap_mining`
-- `host_vars/tn6-seed01.yml` and `tn6-seed02.yml`:
+- `host_vars/tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`:
   - `mining_enabled: true`
   - `bootstrap_mining_address: "<TESTNET_ADDRESS_WITH_FUNDS>"` (replace!)
 - `make deploy-pivx` run to push updated pivx.conf (sets gen=0 on non-miners)
@@ -72,12 +72,12 @@ Above it, PoS becomes valid.
 ### Commands
 ```bash
 # Edit group_vars/all/main.yml: lifecycle_phase: bootstrap_mining
-# Edit seed01/seed02 host_vars: mining_enabled: true
+# Edit cb1/cb2/cb3 seeders host_vars: mining_enabled: true
 
 # Push new pivx.conf to all instances
 make deploy-pivx
 
-# Activate runtime mining on seed01 + seed02 (setgenerate true)
+# Activate runtime mining on cb1/cb2/cb3 seeders (setgenerate true)
 make start-bootstrap-mining
 
 # Monitor height

@@ -1,7 +1,8 @@
 ---
 # examples/example_seed_host.yml
 #
-# Example host_vars for a seed node that also acts as a bootstrap miner during Phase 2.
+# Example pivx_instances entry for a colocated seed node that also acts as a
+# bootstrap miner during Phase 2.
 #
 # Seed nodes serve two purposes:
 #   Phase 1-2: Provide P2P peer discovery for all other nodes
@@ -9,29 +10,22 @@
 #
 # After Phase 2, mining is stopped and the node continues as a seed/relay node.
 
-ansible_host: "198.51.100.1"       # REPLACE: actual VPS IP
-ansible_user: root
-ansible_python_interpreter: /usr/bin/python3
-
-pivx_provider: contabo
-pivx_role: seeder
-
 pivx_instances:
-  - name: tn6-seed01
+  - name: tn6-cb1-seed01
     enabled: true
-    slot: 0
+    slot: 6
     protocol_class: ipv4
     cohort: ipv4
     role: seeder
-    bind_addr: "0.0.0.0"
-    external_ip: "198.51.100.1"    # REPLACE: actual IP
-    p2p_port: 51474
-    rpc_port: 51478
-    rpc_user: pivxrpc
-    rpc_password: "REPLACE_ME"
-    datadir: "/var/lib/pivx/tn6-seed01"
-    logdir: "/var/log/pivx/tn6-seed01"
-    confdir: "/etc/pivx/tn6-seed01"
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51534
+    rpc_port: 51538
+    rpc_user: rpc_seed01
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb1-seed01"
+    logdir: "/var/log/pivx/tn6-cb1-seed01"
+    confdir: "/etc/pivx/tn6-cb1-seed01"
 
     # Phase 2 ONLY: set mining_enabled=true and provide a mining address
     # After transition-to-pos, set mining_enabled=false and re-run deploy-pivx
@@ -41,6 +35,8 @@ pivx_instances:
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: ""           # not a masternode
-    extra_conf: |
-      # Seed node: allow more connections than default
-      maxconnections=125
+    extra_conf:
+      - "maxconnections=256"
+      - "listen=1"
+      - "dnsseed=0"
+      - "listenonion=0"

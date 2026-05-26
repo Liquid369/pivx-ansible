@@ -80,11 +80,11 @@ After restore:
 
 ## Partial cohort isolation (provider subset)
 
-To stop only Contabo's IPv6 instances (not OVH's):
+To stop only a subset of Contabo IPv6 instances:
 
 ```bash
 ansible-playbook -i ansible/inventories/testnet6 \
   ansible/playbooks/chaos/stop_cohort.yml \
-  --limit provider_contabo \
+  --limit 'tn6-cb1:tn6-cb2:tn6-cb3' \
   -e "target_cohort=ipv6"
 ```
