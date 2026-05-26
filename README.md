@@ -87,28 +87,33 @@ ansible-vault encrypt ansible/inventories/testnet6/group_vars/all/vault.yml
 ### Testnet Lifecycle — run in this order for a fresh chain
 
 ```bash
-# Phase 0-1: OS prep + full deployment
+# Phase 0-1: OS prep + seed mesh/full deployment
 make bootstrap                          # OS packages, pivx user, firewall rules
-make deploy                             # PIVX binary, configs, Tor, monitoring
+make deploy                             # PIVX binary, seeders, MN configs, Tor, monitoring
+make status                             # confirm seeders and peers are reachable
 
-# Phase 2: Bootstrap mining (PoW blocks to activate PoS)
-make start-bootstrap-mining             # starts CPU mining on cb1/cb2/cb3 seeders
+# Phase 2: Bootstrap mining (PoW blocks + initial test coins)
+make start-bootstrap-mining             # mine on cb1/cb2/cb3 seeder wallets
 make verify-readiness                   # poll fleet until height >= 201 (nFirstPoSBlock)
 
-# Phase 3: Transition to Proof-of-Stake
+# Phase 3: Transition to Proof-of-Stake and fund staking wallets
 make transition-to-pos                  # stops mining, regenerates pivx.conf with gen=0
 # Edit group_vars/all/main.yml: lifecycle_phase: staking
 make deploy-pivx                        # push updated configs to all instances
 make enable-staking                     # verify staking wallets and activation
 
-# Phase 4: Masternode / Quorum testing
+# Phase 4: Stake until funds mature, then register masternodes
 # (generate BLS keys, fund collateral, broadcast ProRegTx — all done externally)
 # Edit host_vars/<host>.yml: bls_operator_key, masternode_enabled: true
 # Edit group_vars/all/main.yml: lifecycle_phase: masternode_quorum
 make deploy-pivx                        # push masternode configs
 make enable-masternodes                 # verify DMN status and quorum list
 
-# Phase 5: Chaos testing
+# Phase 5: Upgrade/migrate to v6.0 feature-test binaries when ready
+make upgrade-pivx PIVX_VERSION=6.0.0-test
+make verify-readiness
+
+# Phase 6: Chaos testing
 make chaos-inject-latency COHORT=tor DELAY=200ms JITTER=20ms
 make chaos-inject-loss COHORT=ipv6 LOSS=10
 make cohort-stop COHORT=ipv4
@@ -163,6 +168,7 @@ make verify-readiness                   # detailed phase readiness poll
 | [docs/CHAOS_TESTING.md](docs/CHAOS_TESTING.md) | Failure scenarios and procedures |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Day-2 operational tasks |
 | [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) | Engineering assumptions |
+| [runbooks/MIGRATE_TO_V6_FEATURES.md](runbooks/MIGRATE_TO_V6_FEATURES.md) | Upgrade path from stable chain to v6 feature tests |
 | [REVIEW.md](REVIEW.md) | Blocking items + operator checklist |
 
 ---

@@ -8,7 +8,8 @@
 #   5. make transition-to-pos      - Stop mining, set gen=0, restart
 #   6. make enable-staking         - Verify staking wallets and unlock
 #   7. make enable-masternodes     - Verify DMN status (register DMNs first!)
-#   8. make chaos-inject-latency COHORT=tor DELAY=200ms  - Begin chaos testing
+#   8. make upgrade-pivx PIVX_VERSION=6.0.0-test - Migrate to v6 feature binary
+#   9. make chaos-inject-latency COHORT=tor DELAY=200ms  - Begin chaos testing
 #
 # REPEAT FROM GENESIS:
 #   make wipe-chain-dry-run        - Preview what would be wiped
@@ -71,6 +72,7 @@ help:
 	@echo "  transition-to-pos      Stop mining, set gen=0, restart (Phase 2→3)"
 	@echo "  enable-staking         Verify staking status on staking nodes"
 	@echo "  enable-masternodes     Verify DMN status on masternode nodes"
+	@echo "  upgrade-pivx           Upgrade/migrate binary after MN/quorum baseline"
 	@echo ""
 	@echo "CHAIN WIPE / RESTART:"
 	@echo "  wipe-chain-dry-run     Preview what wipe would do (no changes)"

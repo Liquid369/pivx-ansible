@@ -3,8 +3,8 @@
 **Audience**: Engineer with root access to the active Contabo Ubuntu 22.04 hosts, basic shell
 familiarity, no prior Ansible expertise required.
 
-**Goal**: Get from 15 Contabo servers to an active PIVX testnet with LLMQ quorums
-running, ready for chaos testing.
+**Goal**: Get from 15 Contabo servers to an active PIVX testnet with seed
+connectivity, staking, LLMQ quorums, and a clean path to v6.0 feature testing.
 
 Estimated time: 2–4 hours (most time is mining PoW blocks).
 
@@ -117,13 +117,17 @@ make status
 make verify-readiness
 ```
 
-All instances should be running with 0 blocks, connected to seed nodes.
+All instances should be running and able to reach the three colocated seed
+instances. The chain can still be at 0 blocks until mining starts.
 
 ---
 
-## Step 4 — Bootstrap mining (Phase 2)
+## Step 4 — Bootstrap mining and initial coins (Phase 2)
 
-PIVX testnet starts with PoW. You need to mine ~201 blocks before PoS activates.
+PIVX testnet starts with PoW. You need to mine at least the PoS activation
+height, currently modeled as ~201 blocks, before PoS blocks are valid. These
+mined rewards also become the first pool of coins for staking wallets and later
+masternode collateral.
 
 ### 4a — Set mining address
 If you skipped it in Step 1, get a testnet mining address now:
@@ -154,9 +158,13 @@ Mining ~201 blocks with 1 CPU thread takes approximately 30–90 minutes
 depending on CPU speed. You can increase `bootstrap_mining_threads` in
 `group_vars/bootstrap_miners.yml` to speed it up.
 
+For the full 90-masternode target, 201 blocks may not produce enough spendable
+collateral. Treat 201 as the minimum transition height, then continue building
+and maturing funds through staking before registering every masternode.
+
 ---
 
-## Step 5 — Transition to PoS (Phase 3)
+## Step 5 — Transition to PoS and fund stakers (Phase 3)
 
 When `verify-readiness` reports "READY to transition to PoS", run:
 ```bash
@@ -178,7 +186,7 @@ make deploy-pivx   # push final gen=0 conf
 
 ---
 
-## Step 6 — Enable staking (Phase 4)
+## Step 6 — Enable staking and mature funds (Phase 4)
 
 ### 6a — Fund staking wallets
 Each staking instance needs mature (>200 confirms) UTXOs ≥ 1 PIVX.
@@ -211,6 +219,10 @@ make deploy-pivx        # pushes staking=1 in pivx.conf
 make enable-staking     # verifies getstakingstatus
 ```
 
+Keep this phase running until the wallets have enough mature outputs for the
+masternode rollout size you want to test. You can register a small DMN cohort
+first, then scale toward all 90 masternode instances as collateral matures.
+
 ---
 
 ## Step 7 — Register masternodes and enable quorums (Phase 5)
@@ -229,7 +241,23 @@ for full requirements.
 
 ---
 
-## Step 8 — Chaos testing (Phase 6)
+## Step 8 — Migrate to the v6.0 feature-test binary
+
+Only do this after staking and masternode/quorum health is boring in the best
+possible way. That gives you a clean baseline before testing new architecture.
+
+```bash
+# Edit group_vars/all/main.yml with the selected v6.0 artifact and checksum
+make upgrade-pivx PIVX_VERSION=6.0.0-test
+make status
+make verify-readiness
+```
+
+See [runbooks/MIGRATE_TO_V6_FEATURES.md](../runbooks/MIGRATE_TO_V6_FEATURES.md).
+
+---
+
+## Step 9 — Chaos testing (Phase 7)
 
 With quorums active:
 ```bash

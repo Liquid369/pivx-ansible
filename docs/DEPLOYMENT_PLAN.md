@@ -38,9 +38,13 @@ pip install -r requirements.txt
    chmod 600 vault_pass.txt
    ```
 
-4. **DMN BLS operator keys** — generate BLS keypairs for each of the 90 masternode
-   instances. Populate `bls_operator_key` in each instance dict in host_vars.
-   DO NOT commit real keys.
+4. **Bootstrap mining addresses** — set or be ready to generate
+   `bootstrap_mining_address` for `tn6-cb1`, `tn6-cb2`, and `tn6-cb3`.
+   These seed instances mine the first blocks and hold the first test coins.
+
+5. **DMN BLS operator keys** — generate these later, after the network is
+   staking and collateral is available. Leave `bls_operator_key: REPLACE_ME`
+   until an instance is actually being registered as a masternode.
 
 ---
 
@@ -81,9 +85,55 @@ Do NOT proceed with DMN registration until you have all 30 onion addresses.
 
 ---
 
-## Phase 3 — DMN Registration (external to this repo)
+## Phase 3 — Fresh Chain Deployment
 
-Using your PIVX v6.0 wallet on a separate machine:
+```bash
+make deploy
+```
+
+This deploys PIVX, all configured instances, Tor, and monitoring. The three
+seed instances on `tn6-cb1..tn6-cb3` provide initial connectivity for the fresh
+network. At this point the chain may still be at height 0.
+
+**Verify**:
+```bash
+make status
+make verify-readiness
+```
+
+---
+
+## Phase 4 — Bootstrap Mining and Initial Coin Supply
+
+```bash
+make start-bootstrap-mining
+make verify-readiness
+```
+
+The colocated seed instances mine the initial PoW blocks. Mine at least to
+`mining_phase_target_height` so PoS can activate, and remember that additional
+staking time may be required to create and mature enough collateral for the full
+90-masternode target.
+
+---
+
+## Phase 5 — Transition to PoS and Stake
+
+```bash
+make transition-to-pos
+# Edit group_vars/all/main.yml: lifecycle_phase: staking
+make deploy-pivx
+make enable-staking
+```
+
+Fund staking wallets from the mining reward wallets, unlock them for staking,
+and let the chain advance through PoS until enough funds/collateral are mature.
+
+---
+
+## Phase 6 — DMN Registration (external to this repo)
+
+Using your PIVX wallet on a separate machine:
 
 1. Send collateral (10,000 PIVX) for each of the 90 masternode instances
 2. Register each DMN with `protx register` providing:
@@ -98,25 +148,22 @@ host_vars instance entry.
 
 ---
 
-## Phase 4 — Deploy PIVX Instances
+## Phase 7 — Enable Masternode Instances
 
 ```bash
 make deploy-pivx
+make enable-masternodes
 ```
 
-Runs in serial batches (5 hosts at a time). For each host:
-1. Downloads and verifies PIVX binary
-2. Creates per-instance datadir, confdir, logdir
-3. Writes `pivx.conf` and `instance.env` from templates
-4. Installs per-instance systemd unit
-5. Enables and starts the service
-6. Waits for RPC to respond
+This renders masternode config for registered instances and verifies DMN status.
+Enable a small cohort first if you want a lower-risk rollout, then scale toward
+the full active topology.
 
 **Verify**: `make status` — should show all instances starting/syncing.
 
 ---
 
-## Phase 5 — Deploy Monitoring Stack
+## Phase 8 — Deploy or Refresh Monitoring Stack
 
 ```bash
 make deploy-monitoring
@@ -132,7 +179,23 @@ make deploy-monitoring
 
 ---
 
-## Phase 6 — Sync Wait
+## Phase 9 — v6.0 Feature Migration
+
+Once the seed mesh, staking, and masternodes are stable, upgrade to the selected
+v6.0 test binary and begin feature-specific validation:
+
+```bash
+# Edit group_vars/all/main.yml with the chosen v6.0 artifact/checksum
+make upgrade-pivx PIVX_VERSION=6.0.0-test
+make status
+make verify-readiness
+```
+
+See [runbooks/MIGRATE_TO_V6_FEATURES.md](../runbooks/MIGRATE_TO_V6_FEATURES.md).
+
+---
+
+## Phase 10 — Sync Wait
 
 All instances need to sync to chain tip before quorum testing begins. For testnet6
 this may take minutes (fresh chain) or hours (if there's existing history).
@@ -148,7 +211,7 @@ pivx-cli -conf=/etc/pivx/tn6-cb1-v4-mn01/pivx.conf \
 
 ---
 
-## Phase 7 — Quorum Verification
+## Phase 11 — Quorum Verification
 
 Once all instances are synced:
 

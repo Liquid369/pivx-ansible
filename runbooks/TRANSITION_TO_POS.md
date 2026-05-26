@@ -12,10 +12,11 @@ PIVX testnet switches from PoW to PoS at block `nFirstPoSBlock` (~201).
 After this height, PoW blocks are no longer valid — the chain advances only
 through PoS block production by staking wallets.
 
-The transition has three sub-steps:
+The transition has four sub-steps:
 1. Stop runtime mining (`setgenerate false`)
 2. Regenerate `pivx.conf` with `gen=0` everywhere
 3. Distribute staking PIVX to staking instances
+4. Let staking outputs mature before attempting the larger masternode rollout
 
 Phase 3 ("staking") only proceeds once staking nodes have funded, mature UTXOs
 and wallets are unlocked.
@@ -79,7 +80,9 @@ pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf \
 ```
 
 Repeat for each staking instance. Each instance needs ≥ 1 PIVX in a
-mature UTXO (>200 block confirmations before staking becomes active).
+mature UTXO (>200 block confirmations before staking becomes active). Later,
+masternode collateral UTXOs also need to mature before registration/activation,
+so keep this funding plan separate from the minimal staking-fuel plan.
 
 **Maturity wait**: At 60-second block times, 200 blocks ≈ 3-4 hours.
 Plan accordingly; you can move on to masternode setup in parallel.
@@ -151,7 +154,10 @@ restore from the backup mnemonic or wallet.dat file.
 
 ## What Happens Next
 
-After staking is verified: register masternodes.
+After staking is verified, keep the chain running until enough collateral is
+mature. Then register masternodes in waves: start with a small cohort to confirm
+DMN registration and quorum behavior, then scale toward the full 90-instance
+fleet.
 
 See: **[docs/LIFECYCLE.md — Phase 5](../docs/LIFECYCLE.md#phase-5-masternode--quorum-testing)**
 
