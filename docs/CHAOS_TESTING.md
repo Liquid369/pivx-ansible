@@ -55,7 +55,7 @@ masternode instances can form quorum correctly.
 1. `make deploy`
 2. Wait for all instances to sync to chain tip (verify via `make status`)
 3. Observe Grafana Fleet Overview: all green
-4. Confirm quorum membership: `pivx-cli -conf=... quorum list`
+4. Confirm quorum membership: `pivx-cli -conf=... listquorums`
 
 **Expected**: All 94 instances active, quorum forms correctly across the 90
 masternode instances.
@@ -71,7 +71,7 @@ IPv4 and IPv6 masternodes should sustain quorum if they meet the threshold.
 1. Baseline: `make status`
 2. Stop Tor cohort: `make cohort-stop COHORT=tor`
 3. Wait 2 minutes
-4. Check quorum: `pivx-cli quorum list` on observer
+4. Check quorum: `pivx-cli listquorums` on observer
 5. Check logs: `{job="pivxd", cohort="ipv4"} |= "quorum"` in Loki
 6. Restore: `make cohort-start COHORT=tor`
 

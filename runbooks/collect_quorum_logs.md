@@ -28,7 +28,7 @@ On the observer (tn6-infra01):
 ```bash
 pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf \
          -datadir=/var/lib/pivx/tn6-obs01 \
-         quorum dkgstatus | jq .
+         quorumdkgstatus | jq .
 ```
 
 ### Tail live logs on a specific instance
@@ -74,8 +74,8 @@ In Grafana:
 
 ## What to include in a bug report
 
-1. The output of `quorum dkgstatus` from the observer
-2. The output of `quorum list` showing which DMNs are active
+1. The output of `quorumdkgstatus` from the observer
+2. The output of `listquorums` showing which DMNs are active
 3. The relevant log lines from at least 3 different instances across cohorts
 4. The netem/tc state at the time (`tc_qdisc.txt` from debug bundle)
 5. Block heights across affected instances (how far behind were struggling nodes?)
@@ -90,7 +90,7 @@ Add these to `pivx.conf` to increase verbosity (already set in defaults):
 ```
 debug=masternode
 debug=llmq
-debug=mnauth
+debug=net_mn
 debug=net
 ```
 

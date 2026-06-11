@@ -25,7 +25,7 @@ Pauses 30 seconds between batches to allow re-sync.
 # Watch quorum list on observer
 watch -n 10 'pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf \
              -datadir=/var/lib/pivx/tn6-obs01 \
-             quorum list | jq ".llmq_50_60 | length"'
+             listquorums | jq ".llmq_50_60 | length"'
 ```
 
 In Loki:

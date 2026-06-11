@@ -13,8 +13,8 @@
 #   3. Prints mining status and current block heights
 #
 # PREREQUISITES:
-#   - bootstrap_mining_address must be set in each miner's host_vars
 #   - pivxd instances must already be running (make deploy-pivx first)
+#     (rewards go to each miner instance's own wallet — no address needed)
 #   - lifecycle_phase=bootstrap_mining in group_vars/all/main.yml
 #
 # Usage:

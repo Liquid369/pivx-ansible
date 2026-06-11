@@ -36,9 +36,10 @@ pivx_checksum: "sha256:REPLACE_ME"  # REPLACE: fetch from v5.6.1 sha256sums.txt 
 # Sapling parameters
 # ---------------------------------------------------------------------------
 # PIVX requires Sapling zk-SNARK parameter files before pivxd will start.
-# These are downloaded once per host to pivx_params_dir.
-# The pivx_install role runs sapling-fetch-params as pivx_user automatically.
-pivx_params_dir: "/home/{{ pivx_user }}/.pivx-params"
+# These are downloaded once per host (via get_url) to pivx_params_dir.
+# Kept OUTSIDE /home because the pivxd systemd unit uses ProtectHome=true;
+# pivx.conf points at this path via paramsdir=.
+pivx_params_dir: "/var/lib/pivx/params"
 pivx_sapling_params:
   - name: sapling-spend.params
     url: "https://download.z.cash/downloads/sapling-spend.params"
@@ -55,7 +56,6 @@ pivx_sapling_params:
 # ---------------------------------------------------------------------------
 pivx_network: testnet
 chain: testnet6
-pivx_conf_magic: "0x71c1c1c1"   # REPLACE_ME: use actual testnet6 network magic if custom
 
 # ---------------------------------------------------------------------------
 # Instance defaults — overridden per-instance in host_vars
@@ -105,12 +105,15 @@ tor_socks_port: 9050
 # ---------------------------------------------------------------------------
 bootstrap_mining_enabled: false           # set true on miner hosts during Phase 2
 bootstrap_mining_threads: 1               # CPU threads for testnet mining; low value is fine
-bootstrap_mining_address: "REPLACE_ME"   # REPLACE: testnet address that receives mined rewards
-                                          # Generate with: pivx-cli getnewaddress in testnet wallet
+# NOTE: there is no miningaddress conf option in this build — PoW rewards are
+# paid to the mining node's own wallet (GenerateBitcoins mines to vpwallets[0]).
+# Sweep rewards from the seeder wallets after the PoW phase if needed.
+
 # Target block height before Phase 3 staking transition begins.
-# PIVX testnet PoS activates at block N; confirm this with PIVX devs.
-# Chain parameter: nFirstPoSBlock in chainparams.cpp  (placeholder 201 for testnet)
-mining_phase_target_height: 201           # REPLACE if different in this testnet build
+# CONFIRMED against chainparams.cpp (testnet):
+#   consensus.vUpgrades[UPGRADE_POS].nActivationHeight = 201
+# setgenerate refuses to mine once UPGRADE_POS is active.
+mining_phase_target_height: 201
 
 # ---------------------------------------------------------------------------
 # Staking settings
@@ -121,12 +124,17 @@ staking_min_confirmations: 200            # minimum confirmations before a UTXO 
 
 # ---------------------------------------------------------------------------
 # Masternode / quorum settings
+# CONFIRMED against src/consensus/params.h + src/chainparams.cpp:
+#   LLMQ_50_60 = 1  (size 50, minSize 40, threshold 30, DKG every 60 blocks)
+#   LLMQ_400_60 = 2 / LLMQ_400_85 = 3  (impossible with a 60-90 MN fleet)
+#   LLMQ_TEST = 100 (size 3 — regtest-style, only if Testnet6 params add it)
+# NOTE: stock testnet params set llmqTypeChainLocks = LLMQ_400_60. Testnet6
+# chainparams MUST remap chainlocks to LLMQ_50_60 (or a custom small LLMQ)
+# or chainlocks will never form with this fleet size.
 # ---------------------------------------------------------------------------
 masternode_enabled: false                 # set true per-instance once MN reg is done
-# LLMQ type for testnet quorum (placeholder — confirm with PIVX devs)
-# llmq_type_1 = 50/60 for devnet/testnet in recent PIVX builds
-llmq_type: 1
-quorum_size: 10                           # placeholder; set to actual testnet quorum size
+llmq_type: 1                              # LLMQ_50_60
+quorum_size: 50                           # llmq50_60.size (minSize 40 to form)
 
 # ---------------------------------------------------------------------------
 # Chain reset / wipe settings

@@ -16,6 +16,8 @@
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/node_exporter/releases/download/v{{ _ne_version }}/node_exporter-{{ _ne_version }}.linux-amd64.tar.gz"
     dest: "/tmp/node_exporter-{{ _ne_version }}.tar.gz"
+    # set node_exporter_checksum ("sha256:<hash>") to verify; empty skips
+    checksum: "{{ node_exporter_checksum | default(omit, true) }}"
     mode: "0644"
   when: not ne_bin.stat.exists
 

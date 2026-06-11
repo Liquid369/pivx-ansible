@@ -33,7 +33,7 @@ The `collect_debug.yml` playbook gathers:
 | `getblockchaininfo` | RPC per instance |
 | `getpeerinfo` | RPC per instance |
 | `getmasternode list` | RPC per instance (Phase 4+) |
-| `quorum list` / `quorum dkgstatus` | RPC per instance (Phase 4+) |
+| `listquorums` / `quorumdkgstatus` | RPC per instance (Phase 4+) |
 | `journalctl -u pivxd@<instance>` last 500 lines | systemd journal |
 | `systemctl status pivxd@<instance>` | systemd |
 | `ip route show` / `ss -tlnp` | local netstat |
@@ -91,10 +91,10 @@ pivx-cli -conf=$CONF -datadir=$DATA getblockchaininfo
 pivx-cli -conf=$CONF -datadir=$DATA getpeerinfo | jq '[.[] | {addr, subver, synced_blocks}]'
 
 # Masternode status (Phase 4+)
-pivx-cli -conf=$CONF -datadir=$DATA masternode status
+pivx-cli -conf=$CONF -datadir=$DATA getmasternodestatus
 
 # Quorum DKG status
-pivx-cli -conf=$CONF -datadir=$DATA quorum dkgstatus
+pivx-cli -conf=$CONF -datadir=$DATA quorumdkgstatus
 ```
 
 ### Step 5 — Check Tor hidden service (Tor instances only)

@@ -38,18 +38,15 @@ Open `ansible/inventories/testnet6/host_vars/` — there is one `.yml` file per 
 
 **Find and replace every `REPLACE_ME`** in the following files:
 ```
-host_vars/tn6-cb1.yml       → IPs, bootstrap_mining_address, BLS keys later
-host_vars/tn6-cb2.yml       → IPs, bootstrap_mining_address, BLS keys later
-host_vars/tn6-cb3.yml       → IPs, bootstrap_mining_address, BLS keys later
+host_vars/tn6-cb1.yml       → IPs, BLS keys later
+host_vars/tn6-cb2.yml       → IPs, BLS keys later
+host_vars/tn6-cb3.yml       → IPs, BLS keys later
 host_vars/tn6-cb4..cb15.yml → IPs, BLS keys later
 host_vars/tn6-infra01.yml   → IPs
 ```
 Current active seeders are colocated on:
 
 ```text
-host_vars/tn6-cb1.yml       → bootstrap_mining_address for tn6-cb1-seed01
-host_vars/tn6-cb2.yml       → bootstrap_mining_address for tn6-cb2-seed02
-host_vars/tn6-cb3.yml       → bootstrap_mining_address for tn6-cb3-seed03
 ```
 
 **IP addresses**: set `ansible_host` in each file.
@@ -59,9 +56,8 @@ host_vars/tn6-cb3.yml       → bootstrap_mining_address for tn6-cb3-seed03
 python3 -c "import secrets; print(secrets.token_urlsafe(24))"
 ```
 
-**Mining address** (`bootstrap_mining_address` in cb1/cb2/cb3): any valid
-PIVX testnet address. You can generate one later from the pivx-cli wallet
-after Phase 1 deployment.
+**Mining rewards**: paid automatically to each seeder instance's own
+wallet during bootstrap mining — no mining address needs configuring.
 
 **BLS operator keys** (`bls_operator_key`): generated in Phase 5.
 Leave as `REPLACE_ME` for now — masternode instances only.
@@ -130,13 +126,8 @@ mined rewards also become the first pool of coins for staking wallets and later
 masternode collateral.
 
 ### 4a — Set mining address
-If you skipped it in Step 1, get a testnet mining address now:
-```bash
-ssh root@<tn6-cb1-ip>
-pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf getnewaddress
-```
-Copy the output address into `host_vars/tn6-cb1.yml` → `bootstrap_mining_address`.
-Do the same for `tn6-cb2.yml` and `tn6-cb3.yml`.
+Mining rewards accrue in each seeder instance's own wallet — nothing to
+configure before starting.
 
 ### 4b — Start mining
 ```bash
@@ -342,7 +333,7 @@ pivx-cli -conf=/etc/pivx/<instance>/pivx.conf getstakingstatus
 
 ### Masternode not registering
 - Confirm ProRegTx was broadcast and confirmed (6+ blocks)
-- Confirm `bls_operator_key` in host_vars matches the `secret` from `bls generate`
+- Confirm `bls_operator_key` in host_vars matches the `secret` from `generateblskeypair`
 - Check `masternode status` via RPC on the instance
 
 ---

@@ -31,11 +31,15 @@ pivx_rpc_wait_delay: 10
 lifecycle_phase: bootstrap_mining
 
 # Debug categories written to pivx.conf
-# Reduce/expand as needed during different test phases
+# Valid categories per src/logging.cpp — there is no "mnauth" category.
+# Useful for quorum testing: masternode, llmq, dkg, chainlocks, net_mn, net,
+# staking, tor. Reduce/expand as needed during different test phases.
 pivx_debug_categories:
   - masternode
   - llmq
-  - mnauth
+  - dkg
+  - chainlocks
+  - net_mn
   - net
 
 # Maximum connections default

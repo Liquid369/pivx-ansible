@@ -88,9 +88,7 @@ pivx_instances:
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   # --- IPv6 masternode #2 (slot 3) ---
   - name: tn6-cb1-v6-mn04
@@ -112,9 +110,7 @@ pivx_instances:
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   # --- Tor hidden-service masternode #1 (slot 4) ---
   - name: tn6-cb1-tor-mn05
@@ -138,10 +134,7 @@ pivx_instances:
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []
 
   # --- Tor hidden-service masternode #2 (slot 5) ---
   - name: tn6-cb1-tor-mn06
@@ -165,7 +158,4 @@ pivx_instances:
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []

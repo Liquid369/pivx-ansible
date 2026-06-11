@@ -17,6 +17,10 @@ grafana_loki_datasource_name: "Loki"
 grafana_dashboards_path: /etc/grafana/provisioning/dashboards
 grafana_datasources_path: /etc/grafana/provisioning/datasources
 
-# URLs for datasources (resolved to infra host)
-grafana_prometheus_url: "http://{{ loki_host | default('localhost') }}:9090"
-grafana_loki_url: "http://{{ loki_host | default('localhost') }}:3100"
+# Datasource URLs are provisioned as http://localhost:<port> in
+# grafana_datasources.yml.j2 — Grafana, Prometheus and Loki are co-located
+# on the monitoring host. Ports come from group_vars/monitoring.yml.
+
+# Optional: restrict UFW access to Grafana to these source CIDRs.
+# Empty list = allow from anywhere (testnet default — set your admin IPs!).
+grafana_allowed_cidrs: []

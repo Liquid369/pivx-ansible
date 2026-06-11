@@ -10,7 +10,7 @@ to speed up.
 
 ## Background
 
-PIVX testnet uses a hybrid PoW/PoS model. Before block `nFirstPoSBlock` (~201
+PIVX testnet uses a hybrid PoW/PoS model. Before block `UPGRADE_POS activation height` (~201
 on testnet), only PoW blocks are valid. Three colocated seed instances
 (`tn6-cb1-seed01`, `tn6-cb2-seed02`, and `tn6-cb3-seed03`) act as CPU miners
 during this phase via `setgenerate true <threads>`.
@@ -29,19 +29,11 @@ The `make start-bootstrap-mining` playbook sets both.
 - [ ] `make status` shows all instances running at height 0
 - [ ] `host_vars/tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`:
   - `mining_enabled: true`
-  - `bootstrap_mining_address: <valid testnet PIVX address>`
 - [ ] `group_vars/all/main.yml`: `lifecycle_phase: bootstrap_mining`
 
-### Generating a mining address (if not done yet)
-```bash
-ssh root@<tn6-cb1-ip>
-# For the first instance on that host:
-pivx-cli -conf=/etc/pivx/tn6-cb1-seed01/pivx.conf getnewaddress
-# Example output: yAbCdEfGhIjKlMnOpQrStUvWxY
-```
-Copy the address into `host_vars/tn6-cb1.yml` → `bootstrap_mining_address`.
-Repeat for `tn6-cb2.yml` and `tn6-cb3.yml` (you can use the same address or
-different addresses).
+> Mining rewards are paid to each miner instance's own wallet automatically
+> (`setgenerate` is a wallet RPC; this build has no `miningaddress` option).
+> After the PoW phase, sweep the seeder wallets to fund staking/collateral.
 
 ---
 

@@ -5,16 +5,20 @@
 #
 # PIVX testnet bootstrap mining:
 #   - The testnet begins at block 0 with PoW consensus.
-#   - Mining runs until nFirstPoSBlock (testnet param, ~201 by default).
-#   - After that height, the chain can accept PoS blocks. Mining can stop.
+#   - Mining runs until UPGRADE_POS activates (height 201 in testnet
+#     chainparams); setgenerate then refuses with "PoW phase has ended".
+#   - PoW rewards are paid to the mining node's own wallet — there is no
+#     miningaddress option in this build (GenerateBitcoins → vpwallets[0]).
 #
 # This role is called from playbooks/lifecycle/start_bootstrap_mining.yml.
 # It uses the PIVX RPC `setgenerate` command to start/stop CPU mining.
 #
 # Assumptions:
 #   - pivxd instances are already running (pivx_instance role applied first)
-#   - pivx.conf already has gen=1 and miningaddress set (written by pivx_instance
-#     when mining_enabled=true and lifecycle_phase=bootstrap_mining)
+#   - pivx.conf already has gen=1 (written by pivx_instance when
+#     mining_enabled=true and lifecycle_phase=bootstrap_mining)
+#   - The instance has a wallet (default wallet is created automatically);
+#     setgenerate is a wallet RPC and mines to it.
 #   - This role's start/stop actions are via RPC, for runtime control only.
 #     The config-level mining toggle (gen=) is controlled by lifecycle_phase.
 
@@ -29,15 +33,6 @@
 - name: Show mining instances found
   ansible.builtin.debug:
     msg: "Mining-enabled instances on {{ inventory_hostname }}: {{ mining_instances | map(attribute='name') | list }}"
-
-- name: Fail if no mining address set for mining instances
-  ansible.builtin.fail:
-    msg: >
-      Instance {{ item.name }} has mining_enabled=true but no bootstrap_mining_address is set.
-      Set bootstrap_mining_address in host_vars/{{ inventory_hostname }}.yml
-  loop: "{{ mining_instances }}"
-  when: >
-    (item.bootstrap_mining_address | default(bootstrap_mining_address) | default('')) in ['', 'REPLACE_ME']
 
 # ---------------------------------------------------------------------------
 # Start mining via RPC

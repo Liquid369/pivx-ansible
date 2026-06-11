@@ -23,6 +23,54 @@ The v6 feature-test phase uses the same runtime config as
 
 ---
 
+## Chain Upgrade Ladder (from `src/chainparams.cpp` / `consensus/params.h`)
+
+A fresh Testnet6 chain re-walks PIVX's consensus history via the
+`vUpgrades[]` activation heights compiled into the Testnet6 chainparams.
+The heights below are what the *current* testnet uses — Testnet6 chainparams
+must choose its own, and the choice defines our phase schedule:
+
+| Upgrade | Stock testnet height | What it gates |
+|---|---|---|
+| `UPGRADE_POS` / `POS_V2` | 201 | PoW ends; PoS block validity. `setgenerate` refuses past this height |
+| `UPGRADE_ZC*`, `BIP65`, `V3_4`, `V4_0`, `V5_0` | 201 (batched) | script/zerocoin/sapling history — fine to batch early on a test chain |
+| `UPGRADE_V5_2` … `V5_6` | staggered | v5-era rules (e.g. exchange addrs at V5_6); batch early unless testing them |
+| `UPGRADE_V6_0` | **NO_ACTIVATION_HEIGHT** | DMN/DIP3: ProRegTx special txs, deterministic MN list, LLMQ quorum commitments, new MN payment rules |
+
+Key consequences for planning Testnet6:
+
+1. **PoW phase length = UPGRADE_POS height.** Block reward maturity is 15
+   (testnet `nCoinbaseMaturity`), MN collateral is 10,000 tPIV
+   (`nMNCollateralAmt`), so the PoW+early-PoS phases must mint enough
+   spendable coin for 60–90 collaterals plus staking balances.
+2. **Legacy masternodes run between V5-era activation and DMN enforcement.**
+   The legacy→DMN sunset is NOT a hard fork height — it is
+   `SPORK_21_LEGACY_MNS_MAX_HEIGHT` (evo/deterministicmns.cpp:
+   `LegacyMNObsolete()`). Testnet6 chainparams need our own spork keypair
+   (`strSporkPubKey`), and whoever holds the private key drives the
+   legacy→DMN cutover with the `spork` RPC. This is the exact mainnet
+   upgrade path we are rehearsing — schedule V6_0 activation mid-chain,
+   not at genesis.
+3. **ProRegTx is rejected before V6_0 activates**
+   (`evo/specialtx_validation.cpp`), and `protx`/evo RPCs error before then
+   (`rpc/rpcevo.cpp`). Phase 5 (DMN registration) can only start after the
+   V6_0 height passes.
+4. **LLMQ sizing must match the fleet.** Stock params wire
+   `LLMQ_50_60` (size 50 / minSize 40 / threshold 30, DKG every 60 blocks)
+   plus `LLMQ_400_60`/`LLMQ_400_85`, and point **chainlocks at LLMQ_400_60 —
+   which can never form with 60–90 MNs**. Testnet6 chainparams must remap
+   `llmqTypeChainLocks` to a quorum the fleet can actually fill (LLMQ_50_60
+   with 75 MNs, or a custom small LLMQ / `LLMQ_TEST` size-3 for early
+   smoke tests).
+5. **Recommended Testnet6 activation schedule** (rehearses the real upgrade
+   while keeping early phases fast): batch everything through `V5_6` at the
+   PoS height (e.g. 201), run legacy masternodes long enough to validate
+   tier-two basics, then activate `V6_0` at a planned mid-chain height,
+   register DMNs, and finally set spork 21 to sunset legacy MNs — observing
+   quorum formation across IPv4/IPv6/Tor at each step.
+
+---
+
 ## Phase 1: Fresh Chain Bring-Up and Seed Mesh
 
 ### What this does
@@ -35,7 +83,8 @@ network stable initial peer discovery.
 - All active hosts reachable via SSH
 - `host_vars/*.yml` filled in (see `REVIEW.md` for REPLACE_ME checklist)
   - `rpc_password` set per instance
-  - `bootstrap_mining_address` set in cb1/cb2/cb3 seeders host_vars
+  - (mining rewards go to each seeder instance's own wallet — no mining
+    address is needed; this build has no `miningaddress` option)
 - SSH public key deployed on all hosts
 
 ### Commands
@@ -62,7 +111,7 @@ may still be at `blocks: 0` until bootstrap mining begins.
 
 During Phase 2, `tn6-cb1-seed01`, `tn6-cb2-seed02`, and `tn6-cb3-seed03`
 act as CPU miners. They mine blocks to build the chain height past
-`nFirstPoSBlock` (set as `mining_phase_target_height` in group_vars, default:
+the UPGRADE_POS activation height (set as `mining_phase_target_height` in group_vars, default:
 201) and create the first spendable test coins for staking and masternode
 collateral.
 
@@ -74,7 +123,7 @@ Above it, PoS becomes valid.
 - `group_vars/all/main.yml`: `lifecycle_phase: bootstrap_mining`
 - `host_vars/tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`:
   - `mining_enabled: true`
-  - `bootstrap_mining_address: "<TESTNET_ADDRESS>"` for the local mining wallet
+  - (rewards are mined to each seeder instance's own wallet automatically)
 - `make deploy-pivx` run to push updated pivx.conf (sets gen=0 on non-miners)
 
 ### Commands
@@ -197,7 +246,7 @@ This is the target state for quorum failure and resilience tests.
 
 1. **BLS key generation** (per DMN instance):
    ```bash
-   pivx-cli bls generate
+   pivx-cli generateblskeypair
    # → { "secret": "...", "public": "..." }
    ```
    Fill `bls_operator_key` in `host_vars/<host>.yml` for each masternode instance.
@@ -240,10 +289,10 @@ make enable-masternodes
 ### Verifying quorum formation
 ```bash
 # Check DKG status
-pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf quorum dkgstatus
+pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf quorumdkgstatus
 
 # List active quorums
-pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf quorum list
+pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf listquorums
 
 # Check specific quorum info
 pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf quorum info <llmq_type> <quorum_hash>
@@ -251,7 +300,7 @@ pivx-cli -conf=/etc/pivx/tn6-cb1/pivx.conf quorum info <llmq_type> <quorum_hash>
 
 ### Expected result
 All DMNs show `"status": "READY"` in `masternode status`.
-`quorum list` shows at least one active LLMQ quorum.
+`listquorums` shows at least one active LLMQ quorum.
 
 ---
 
@@ -324,7 +373,7 @@ make chaos-clear COHORT=ipv4
 ### Collect debug bundle
 ```bash
 make collect-debug
-# Pulls logs, getblockchaininfo, getmasternode list, quorum dkgstatus
+# Pulls logs, getblockchaininfo, getmasternode list, quorumdkgstatus
 # from all instances and archives locally
 ```
 
@@ -369,14 +418,14 @@ make start-bootstrap-mining
 
 ---
 
-## Confirming `nFirstPoSBlock`
+## Confirming `UPGRADE_POS activation height`
 
 The `mining_phase_target_height` default of `201` is a placeholder based on
 typical PIVX testnet parameters. **Confirm the actual value** before starting
 Phase 2:
 
 ```bash
-grep -r "nFirstPoSBlock\|nPosStartHeight" <pivx-core-src>/src/chainparams.cpp
+grep -r "UPGRADE_POS activation height\|nPosStartHeight" <pivx-core-src>/src/chainparams.cpp
 ```
 
 Or ask the PIVX devs for the testnet value and update:

@@ -27,7 +27,8 @@
           - "-datadir={{ item.item.datadir }}"
           - "getblockcount"
       loop: "{{ svc_status.results }}"
-      when: item.stdout == 'active'
+      # skipped results (enabled: false instances) carry no stdout — guard it
+      when: (item.stdout | default('')) == 'active'
       register: blockheights
       changed_when: false
       failed_when: false

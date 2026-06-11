@@ -77,11 +77,24 @@
     - "files/grafana_dashboards/*.json"
   notify: restart grafana
 
-- name: ufw - allow Grafana (restrict to trusted CIDRs in production)
+# If grafana_allowed_cidrs is set, only those sources may reach Grafana.
+# Empty list falls back to allow-from-anywhere (testnet default) — set your
+# admin IPs in group_vars/monitoring.yml to lock this down.
+- name: ufw - allow Grafana from trusted CIDRs
   community.general.ufw:
     rule: allow
     port: "{{ grafana_port }}"
     proto: tcp
+    src: "{{ item }}"
+  loop: "{{ grafana_allowed_cidrs }}"
+  when: grafana_allowed_cidrs | length > 0
+
+- name: ufw - allow Grafana from anywhere (no trusted CIDRs configured)
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_port }}"
+    proto: tcp
+  when: grafana_allowed_cidrs | length == 0
 
 - name: Enable and start Grafana
   ansible.builtin.service:

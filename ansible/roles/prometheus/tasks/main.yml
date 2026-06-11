@@ -29,6 +29,9 @@
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/prometheus/releases/download/v{{ _prom_version }}/prometheus-{{ _prom_version }}.linux-amd64.tar.gz"
     dest: "/tmp/prometheus-{{ _prom_version }}.tar.gz"
+    # set prometheus_checksum ("sha256:<hash>" from the release sha256sums)
+    # to verify the download; empty skips verification
+    checksum: "{{ prometheus_checksum | default(omit, true) }}"
     mode: "0644"
 
 - name: Extract Prometheus

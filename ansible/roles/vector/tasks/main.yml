@@ -13,10 +13,12 @@
   ansible.builtin.set_fact:
     _vector_version: "{{ vector_version | default('0.37.0') }}"
 
-- name: Add Vector apt repo key
+- name: Download Vector .deb package
   ansible.builtin.get_url:
     url: https://packages.timber.io/vector/debian/pool/main/v/vector/vector_{{ _vector_version }}-1_amd64.deb
     dest: "/tmp/vector_{{ _vector_version }}_amd64.deb"
+    # set vector_checksum ("sha256:<hash>") to verify; empty skips
+    checksum: "{{ vector_checksum | default(omit, true) }}"
     mode: "0644"
 
 - name: Install Vector .deb

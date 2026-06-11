@@ -12,6 +12,8 @@
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/blackbox_exporter/releases/download/v{{ blackbox_exporter_version }}/blackbox_exporter-{{ blackbox_exporter_version }}.linux-amd64.tar.gz"
     dest: "/tmp/blackbox_exporter-{{ blackbox_exporter_version }}.tar.gz"
+    # set blackbox_exporter_checksum ("sha256:<hash>") to verify; empty skips
+    checksum: "{{ blackbox_exporter_checksum | default(omit, true) }}"
     mode: "0644"
   when: not bb_bin.stat.exists
 

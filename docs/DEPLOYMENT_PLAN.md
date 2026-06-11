@@ -39,7 +39,7 @@ pip install -r requirements.txt
    ```
 
 4. **Bootstrap mining addresses** — set or be ready to generate
-   `bootstrap_mining_address` for `tn6-cb1`, `tn6-cb2`, and `tn6-cb3`.
+   (mining rewards go to each seeder instance's own wallet — no address needed).
    These seed instances mine the first blocks and hold the first test coins.
 
 5. **DMN BLS operator keys** — generate these later, after the network is
@@ -219,7 +219,7 @@ Once all instances are synced:
 # On observer (tn6-infra01 / tn6-obs01 instance):
 pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf \
          -datadir=/var/lib/pivx/tn6-obs01 \
-         quorum list
+         listquorums
 ```
 
 Expected: All registered DMNs appear in the quorum list.
