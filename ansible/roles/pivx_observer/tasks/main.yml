@@ -2,7 +2,7 @@
 # roles/pivx_observer/tasks/main.yml
 #
 # Observer node configuration.
-# Observer nodes run a full PIVX node with txindex/addressindex enabled
+# Observer nodes run a full PIVX node with txindex enabled
 # and expose RPC for monitoring queries without participating in consensus.
 #
 # This role runs AFTER pivx_instance and validates the observer is up.
@@ -45,8 +45,7 @@
       - "/opt/pivx/current/bin/pivx-cli"
       - "-conf={{ item.confdir }}/pivx.conf"
       - "-datadir={{ item.datadir }}"
-      - "quorum"
-      - "list"
+      - "listquorums"
   loop: "{{ observer_instances }}"
   loop_control:
     label: "{{ item.name }}"

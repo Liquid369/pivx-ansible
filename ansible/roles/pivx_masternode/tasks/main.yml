@@ -30,7 +30,7 @@
     msg: >-
       WARNING: Instance {{ item.name }} has masternode_enabled=true but
       bls_operator_key is still a placeholder ('{{ item.bls_operator_key }}').
-      Generate a BLS keypair: pivx-cli bls generate
+      Generate a BLS keypair: pivx-cli generateblskeypair
       Then fill bls_operator_key in host_vars/{{ inventory_hostname }}.yml
   loop: "{{ mn_instances }}"
   loop_control:
@@ -75,14 +75,15 @@
   changed_when: false
   failed_when: false
 
+# getmasternodestatus is this build's RPC (rpc/masternode.cpp); for DMNs it
+# returns the dmn JSON plus "netaddr" and "status" ("Ready" when operational).
 - name: Query masternode status
   ansible.builtin.command:
     argv:
       - "{{ pivx_cli_binary }}"
       - "-conf={{ item.confdir }}/pivx.conf"
       - "-datadir={{ item.datadir }}"
-      - "masternode"
-      - "status"
+      - "getmasternodestatus"
   loop: "{{ mn_instances }}"
   loop_control:
     label: "{{ item.name }}"
@@ -99,38 +100,44 @@
   loop_control:
     label: "{{ item.item.name }}"
 
+- name: Initialise masternode state map
+  ansible.builtin.set_fact:
+    mn_state_map: {}
+
 - name: Parse masternode state from status output
   ansible.builtin.set_fact:
     mn_state_map: >-
-      {{ mn_state_map | default({}) | combine({
+      {{ mn_state_map | combine({
            item.item.name: (item.stdout | from_json).status | default('UNKNOWN')
          }) }}
   loop: "{{ mn_status_results.results }}"
   loop_control:
     label: "{{ item.item.name }}"
   when: item.rc == 0
-  failed_when: false
 
-- name: Warn about masternodes not in READY state
+# Active DMN status strings come from CActiveDeterministicMasternodeManager::
+# GetStatus() (activemasternode.cpp) — "Ready" when operational.
+- name: Warn about masternodes not in Ready state
   ansible.builtin.debug:
     msg: >-
       Instance {{ item.name }} status is
-      {{ mn_state_map[item.name] | default('UNKNOWN') }} — not yet READY.
+      '{{ mn_state_map.get(item.name, 'UNKNOWN') }}' — not yet Ready.
       If ProRegTx was recently broadcast, allow 6+ confirmations.
       Then re-run: make enable-masternodes
   loop: "{{ mn_instances }}"
   loop_control:
     label: "{{ item.name }}"
-  when: mn_state_map[item.name] | default('UNKNOWN') not in ['READY', 'ENABLED']
+  when: mn_state_map.get(item.name, 'UNKNOWN') != 'Ready'
 
+# listquorums is this build's RPC (rpc/rpcquorums.cpp) — there is no
+# Dash-style "quorum list" subcommand.
 - name: Check LLMQ quorum list (one sample per host)
   ansible.builtin.command:
     argv:
       - "{{ pivx_cli_binary }}"
       - "-conf={{ (mn_instances | first).confdir }}/pivx.conf"
       - "-datadir={{ (mn_instances | first).datadir }}"
-      - "quorum"
-      - "list"
+      - "listquorums"
   register: quorum_list_result
   changed_when: false
   failed_when: false

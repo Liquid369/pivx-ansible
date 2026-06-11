@@ -26,11 +26,17 @@
     - /var/lib/loki/chunks
     - /var/lib/loki/index
     - /var/lib/loki/wal
+    # referenced by loki.yml.j2 (ruler rules_directory / compactor
+    # working_directory) — Loki fails to start without them
+    - /var/lib/loki/rules
+    - /var/lib/loki/compactor
 
 - name: Download Loki binary
   ansible.builtin.get_url:
     url: "https://github.com/grafana/loki/releases/download/v{{ _loki_version }}/loki-linux-amd64.zip"
     dest: "/tmp/loki-linux-amd64-{{ _loki_version }}.zip"
+    # set loki_checksum ("sha256:<hash>") to verify; empty skips
+    checksum: "{{ loki_checksum | default(omit, true) }}"
     mode: "0644"
 
 - name: Extract Loki binary
@@ -69,11 +75,14 @@
     - reload systemd
     - restart loki
 
-- name: ufw - allow Loki (from any fleet host)
+# Only fleet hosts push logs — don't expose Loki to the internet.
+- name: ufw - allow Loki from fleet hosts only
   community.general.ufw:
     rule: allow
     port: "{{ loki_port }}"
     proto: tcp
+    src: "{{ hostvars[item]['ansible_host'] }}"
+  loop: "{{ groups['all'] | difference([inventory_hostname]) }}"
 
 - name: Enable and start Loki
   ansible.builtin.service:

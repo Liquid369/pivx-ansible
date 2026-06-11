@@ -189,7 +189,7 @@ If this is a masternode host, follow the masternode registration process at
 Generate BLS keypair on the new instance:
 ```bash
 ssh root@<new-host-ip>
-pivx-cli -conf=/etc/pivx/tn6-cb16-mn1/pivx.conf bls generate
+pivx-cli -conf=/etc/pivx/tn6-cb16-mn1/pivx.conf generateblskeypair
 ```
 
 Fill `bls_operator_key` with the `secret` output.

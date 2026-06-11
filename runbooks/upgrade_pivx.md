@@ -106,4 +106,4 @@ is all that's needed for an in-place version switch.
     -m file -a "path=/opt/pivx/releases/<old-version> state=absent" --become
   ```
 - Log the upgrade in a git commit message for traceability.
-- Confirm `nFirstPoSBlock` has not changed in the new version's chainparams.cpp.
+- Confirm `UPGRADE_POS activation height` has not changed in the new version's chainparams.cpp.

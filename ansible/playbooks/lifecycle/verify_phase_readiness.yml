@@ -36,7 +36,7 @@
 
     - name: Check service status per instance
       ansible.builtin.systemd:
-        name: "pivxd@{{ item.name }}"
+        name: "pivxd@{{ item.name }}.service"
       loop: "{{ enabled_instances }}"
       loop_control:
         label: "{{ item.name }}"
@@ -158,8 +158,7 @@
           - "{{ pivx_cli }}"
           - "-conf={{ (enabled_instances | first).confdir }}/pivx.conf"
           - "-datadir={{ (enabled_instances | first).datadir }}"
-          - "masternode"
-          - "count"
+          - "getmasternodecount"
       register: mn_count
       changed_when: false
       failed_when: false
@@ -222,7 +221,7 @@
 
           {% if lifecycle_phase == 'bootstrap_mining' %}
           PHASE 2 CHECK:
-            Target height (nFirstPoSBlock) : {{ mining_phase_target_height }}
+            Target height (UPGRADE_POS activation) : {{ mining_phase_target_height }}
             Current max height             : {{ max_height }}
             {% if max_height | int >= mining_phase_target_height | int %}
             STATUS: READY to transition to PoS — run: make transition-to-pos
@@ -239,8 +238,8 @@
 
           {% if lifecycle_phase == 'masternode_quorum' %}
           PHASE 4 CHECK:
-            Check quorum DKG: pivx-cli quorum dkgstatus
-            Check LLMQ list:  pivx-cli quorum list
+            Check quorum DKG: pivx-cli quorumdkgstatus
+            Check LLMQ list:  pivx-cli listquorums
           {% endif %}
 
           ============================================================

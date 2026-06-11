@@ -46,8 +46,7 @@
           - "/opt/pivx/current/bin/pivx-cli"
           - "-conf={{ item.confdir }}/pivx.conf"
           - "-datadir={{ item.datadir }}"
-          - "masternode"
-          - "status"
+          - "getmasternodestatus"
       loop: "{{ mn_instances }}"
       loop_control:
         label: "{{ item.name }}"
@@ -70,8 +69,7 @@
           - "/opt/pivx/current/bin/pivx-cli"
           - "-conf={{ item.confdir }}/pivx.conf"
           - "-datadir={{ item.datadir }}"
-          - "quorum"
-          - "list"
+          - "listquorums"
       loop: "{{ mn_instances | unique(attribute='confdir') | list }}"
       loop_control:
         label: "{{ item.name }}"
@@ -91,7 +89,7 @@
         msg: >
           WARNING: Instance {{ item.name }} has masternode_enabled=true
           but bls_operator_key is not set or is REPLACE_ME.
-          Generate: pivx-cli bls generate
+          Generate: pivx-cli generateblskeypair
           Then fill bls_operator_key in host_vars/{{ inventory_hostname }}.yml
       loop: "{{ mn_instances }}"
       loop_control:
@@ -108,7 +106,7 @@
           ============================================================
           Masternode activation check complete.
 
-          If masternodes show status READY/ENABLED, you are in Phase 4.
+          If getmasternodestatus shows status "Ready", you are in Phase 4.
 
           NEXT:
           - Monitor quorum DKG: check Grafana dashboards
@@ -116,8 +114,8 @@
           - Collect quorum logs: make collect-debug
 
           QUORUM READINESS CHECK:
-            pivx-cli quorum dkgstatus
-            pivx-cli quorum info <llmq_type> <quorum_hash>
+            pivx-cli quorumdkgstatus
+            pivx-cli getquoruminfo <llmq_type> <quorum_hash>
 
           DMN REGISTRATION (outside Ansible):
             This must be done in PIVX Core wallet with:

@@ -3,9 +3,12 @@
 
 vector_version: "0.36.0"
 
-# Loki endpoint to ship logs to (should point to tn6-infra01 or monitoring host)
-# Override with loki_endpoint in group_vars/all/main.yml
-vector_loki_endpoint: "http://{{ loki_host | default('localhost') }}:3100"
+# Vector API / internal metrics port (vector.toml [api] section)
+vector_port: 8686
+
+# Logs ship to {{ loki_endpoint }} — defined in group_vars/all/main.yml,
+# pointing at the monitoring host. Defaulted here for standalone role use.
+loki_endpoint: "http://localhost:3100"
 
 # How many parallel write requests to Loki
 vector_loki_request_concurrency: 10

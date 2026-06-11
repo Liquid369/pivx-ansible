@@ -25,10 +25,6 @@ host_ipv4_2: "203.0.113.111"    # REPLACE_ME  (second public IPv4 / failover IP)
 host_ipv6:   "2001:db8:cb::11"    # REPLACE_ME
 host_ipv6_2: "2001:db8:cb::12"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
 
-# Mining reward address for the colocated bootstrap seeder.
-# Generate with: pivx-cli -testnet getnewaddress "" bech32
-bootstrap_mining_address: "REPLACE_ME"
-
 # Firewall: open all PIVX P2P slots used by this host.
 ufw_pivx_ports:
   - "{{ pivx_p2p_port_base }}"
@@ -102,9 +98,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   - name: tn6-cb1-v6-mn04
     enabled: true
@@ -125,9 +119,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   - name: tn6-cb1-tor-mn05
     enabled: true
@@ -150,10 +142,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []
 
   - name: tn6-cb1-tor-mn06
     enabled: true
@@ -176,10 +165,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []
 
   - name: tn6-cb1-seed01
     enabled: true
@@ -201,7 +187,5 @@ pivx_instances:
     masternode_enabled: false    # seeders are bootstrap peers, not DMNs
     bls_operator_key: ""
     extra_conf:
-      - "maxconnections=256"
-      - "listen=1"
       - "dnsseed=0"
       - "listenonion=0"

@@ -28,6 +28,8 @@
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/alertmanager/releases/download/v{{ _am_version }}/alertmanager-{{ _am_version }}.linux-amd64.tar.gz"
     dest: "/tmp/alertmanager-{{ _am_version }}.tar.gz"
+    # set alertmanager_checksum ("sha256:<hash>") to verify; empty skips
+    checksum: "{{ alertmanager_checksum | default(omit, true) }}"
     mode: "0644"
 
 - name: Extract Alertmanager

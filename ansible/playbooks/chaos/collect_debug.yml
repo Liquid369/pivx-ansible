@@ -4,7 +4,7 @@
 # Output lands in debug_bundles/<timestamp>/<host>/ locally.
 #
 # What is collected:
-#   - pivx-cli debug info (getblockchaininfo, getpeerinfo, quorum list, masternode list)
+#   - pivx-cli debug info (getblockchaininfo, getpeerinfo, listquorums, listmasternodes)
 #   - Last 500 lines of each instance log
 #   - tc/netem state
 #   - Systemd unit status
@@ -34,9 +34,9 @@
         mkdir -p "$OUTDIR"
         $CLI -conf="$CONF" -datadir="$DDIR" getblockchaininfo > "$OUTDIR/getblockchaininfo.json" 2>&1 || true
         $CLI -conf="$CONF" -datadir="$DDIR" getpeerinfo        > "$OUTDIR/getpeerinfo.json" 2>&1 || true
-        $CLI -conf="$CONF" -datadir="$DDIR" masternode list     > "$OUTDIR/mn_list.json" 2>&1 || true
-        $CLI -conf="$CONF" -datadir="$DDIR" quorum list         > "$OUTDIR/quorum_list.json" 2>&1 || true
-        $CLI -conf="$CONF" -datadir="$DDIR" quorum dkgstatus    > "$OUTDIR/dkg_status.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" listmasternodes     > "$OUTDIR/mn_list.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" listquorums         > "$OUTDIR/quorum_list.json" 2>&1 || true
+        $CLI -conf="$CONF" -datadir="$DDIR" quorumdkgstatus     > "$OUTDIR/dkg_status.json" 2>&1 || true
         tail -500 "{{ item.logdir }}/debug.log" > "$OUTDIR/debug_tail.log" 2>&1 || true
       args:
         executable: /bin/bash

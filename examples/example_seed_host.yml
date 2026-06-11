@@ -30,13 +30,10 @@ pivx_instances:
     # Phase 2 ONLY: set mining_enabled=true and provide a mining address
     # After transition-to-pos, set mining_enabled=false and re-run deploy-pivx
     mining_enabled: true                        # PHASE 2: set to true
-    bootstrap_mining_address: "REPLACE_ME"      # REPLACE: testnet PIVX address for mining rewards
 
     staking_enabled: false
     masternode_enabled: false
     bls_operator_key: ""           # not a masternode
     extra_conf:
-      - "maxconnections=256"
-      - "listen=1"
       - "dnsseed=0"
       - "listenonion=0"

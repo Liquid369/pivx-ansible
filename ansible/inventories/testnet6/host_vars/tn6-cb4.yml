@@ -96,9 +96,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   - name: tn6-cb4-v6-mn04
     enabled: true
@@ -119,9 +117,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "ipv4=0"
-      - "ipv6=1"
+    extra_conf: []
 
   - name: tn6-cb4-tor-mn05
     enabled: true
@@ -144,10 +140,7 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []
 
   - name: tn6-cb4-tor-mn06
     enabled: true
@@ -170,7 +163,4 @@ pivx_instances:
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
-    extra_conf:
-      - "onlynet=onion"
-      - "proxy=127.0.0.1:9050"
-      - "listen=1"
+    extra_conf: []

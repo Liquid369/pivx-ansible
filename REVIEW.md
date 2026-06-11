@@ -26,7 +26,6 @@
 
 - Replace all placeholder `203.0.113.x` and `2001:db8:*` addresses.
 - Populate `ansible/inventories/testnet6/group_vars/all/vault.yml` from the example and encrypt it.
-- Set `bootstrap_mining_address` in `tn6-cb1.yml`, `tn6-cb2.yml`, and `tn6-cb3.yml`.
 - Set real `pivx_checksum` before downloading release binaries.
 - Confirm Testnet6 values when they are available: network magic, PoS activation height, LLMQ type, quorum size.
 - Fill BLS operator keys and set `masternode_enabled: true` only after DMN registration is ready.

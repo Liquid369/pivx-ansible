@@ -4,15 +4,15 @@
 alertmanager_version: "0.27.0"
 alertmanager_port: 9093
 
-# Slack webhook URL for alert notifications.
-# Set in vault.yml or as an extra var. Leave REPLACE_ME to disable Slack.
-alertmanager_slack_webhook_url: "REPLACE_ME"
-alertmanager_slack_channel: "#testnet6-alerts"
+# Discord webhook for alert notifications (team uses Discord/Telegram, not
+# Slack). Set here or via vault_alertmanager_discord_webhook in vault.yml.
+# Leave empty/REPLACE_ME to disable Discord.
+alertmanager_discord_webhook_url: ""
 
-# Email (optional — leave empty to disable)
-alertmanager_email_to: ""
-alertmanager_email_from: "alertmanager@testnet6.internal"
-alertmanager_smtp_host: ""
+# Telegram bot for alert notifications. Both values must be set to enable.
+# Prefer vault_alertmanager_telegram_bot_token / _chat_id in vault.yml.
+alertmanager_telegram_bot_token: ""
+alertmanager_telegram_chat_id: ""
 
 # How long to hold off sending repeat alerts for the same firing state
 alertmanager_repeat_interval: "4h"

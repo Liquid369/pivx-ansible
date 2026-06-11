@@ -11,11 +11,25 @@
 # To regenerate: make deploy-pivx LIMIT={{ inventory_hostname }}
 
 # =============================================================================
-# NETWORK
+# NETWORK SELECTION
 # =============================================================================
 testnet=1
-maxconnections={{ pivx_maxconnections | default(125) }}
+
+# IMPORTANT: everything below lives in the [test] section. This build gates
+# addnode/connect/port/bind/rpcport/rpcbind/wallet to the active network
+# section (util/system.cpp m_network_only_args) — values for those keys in
+# the global section are silently IGNORED when testnet=1.
+[test]
+
+# =============================================================================
+# GENERAL
+# =============================================================================
+maxconnections={{ 256 if instance.role == 'seeder' else (pivx_maxconnections | default(125)) }}
 printtoconsole={{ pivx_printtoconsole | default(1) }}
+
+# Sapling zk-SNARK parameters. Kept outside /home because the systemd unit
+# uses ProtectHome=true.
+paramsdir={{ pivx_params_dir }}
 
 {% if instance.protocol_class == 'ipv4' %}
 # --- IPv4 mode ---
@@ -27,8 +41,7 @@ externalip={{ instance.external_ip }}
 listen=1
 bind={{ instance.bind_addr }}
 externalip={{ instance.external_ip }}
-ipv4=0
-ipv6=1
+onlynet=ipv6
 {% elif instance.protocol_class == 'tor' %}
 # --- Tor-only mode ---
 # Binds on loopback; all traffic routed through Tor SOCKS proxy.
@@ -82,16 +95,13 @@ debug={{ cat }}
 
 {% if (instance.mining_enabled | default(false)) and lifecycle_phase == 'bootstrap_mining' %}
 # --- Phase 2: Bootstrap Mining ---
-# This instance is configured to mine blocks to bootstrap the chain.
-# Mining will be disabled when `make stop-bootstrap-mining` is run (Phase 3).
+# This instance mines PoW blocks to bootstrap the chain. Rewards are paid to
+# this node's own wallet (there is no miningaddress option in this build —
+# GenerateBitcoins mines to vpwallets[0]). PoW ends at the UPGRADE_POS
+# activation height ({{ mining_phase_target_height | default(201) }} on testnet).
+# Mining is disabled when `make stop-bootstrap-mining` is run (Phase 3).
 gen=1
 genproclimit={{ bootstrap_mining_threads | default(1) }}
-{% set _mine_addr = instance.bootstrap_mining_address | default(bootstrap_mining_address) | default('') %}
-{% if _mine_addr != '' and _mine_addr != 'REPLACE_ME' %}
-miningaddress={{ _mine_addr }}
-{% else %}
-# miningaddress= not set — REPLACE bootstrap_mining_address in host_vars!
-{% endif %}
 {% else %}
 # Mining disabled (lifecycle_phase={{ lifecycle_phase }} or mining_enabled=false)
 gen=0
@@ -105,12 +115,13 @@ staking=0
 {% endif %}
 
 {% if (instance.masternode_enabled | default(false)) and instance.role == 'masternode' %}
-# --- Phase 4: Masternode enabled ---
+# --- Phase 4: Masternode enabled (deterministic) ---
 masternode=1
 {% if instance.bls_operator_key | default('') not in ['', 'REPLACE_ME'] %}
-masternodeblsprivkey={{ instance.bls_operator_key }}
+mnoperatorprivatekey={{ instance.bls_operator_key }}
 {% else %}
-# masternodeblsprivkey= not set — fill bls_operator_key in host_vars!
+# mnoperatorprivatekey= not set — generate with `pivx-cli generateblskeypair`
+# and fill bls_operator_key in host_vars!
 {% endif %}
 {% endif %}
 
@@ -118,20 +129,18 @@ masternodeblsprivkey={{ instance.bls_operator_key }}
 # ROLE-SPECIFIC SETTINGS
 # =============================================================================
 {% if instance.role == 'seeder' %}
-# Seeder node — high connection count, no masternode behavior
-maxconnections=256
+# Seeder node — high connection count (maxconnections set above),
+# no masternode behavior.
 {% elif instance.role == 'observer' %}
-# Observer node — reads blockchain, does not participate in consensus
+# Observer node — reads blockchain, does not participate in consensus.
+# (No addressindex option exists in this build; txindex only.)
 txindex=1
-addressindex=1
 {% endif %}
 
 # =============================================================================
 # INSTANCE-SPECIFIC EXTRAS
 # These lines come from instance.extra_conf in host_vars.
 # =============================================================================
-{% for line in instance.extra_conf | default([]) %}
+{% for line in instance.extra_conf | default([], true) %}
 {{ line }}
 {% endfor %}
-
-

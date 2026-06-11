@@ -16,7 +16,7 @@ you actually want to test.
 - [ ] `make verify-readiness` is healthy for the current lifecycle phase.
 - [ ] Staking wallets are producing PoS blocks.
 - [ ] The intended masternode cohort is registered and enabled.
-- [ ] `quorum list` and `quorum dkgstatus` show expected quorum activity.
+- [ ] `listquorums` and `quorumdkgstatus` show expected quorum activity.
 - [ ] The v6.0 test binary URL and SHA256 are known.
 - [ ] Any changed chain parameters or activation heights are written down.
 - [ ] Provider snapshots or another rollback route exist for risky builds.
@@ -69,8 +69,8 @@ Spot-check from an observer or a known-good node:
 ```bash
 pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf getblockchaininfo
 pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf getstakingstatus
-pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf quorum list
-pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf quorum dkgstatus
+pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf listquorums
+pivx-cli -conf=/etc/pivx/tn6-obs01/pivx.conf quorumdkgstatus
 ```
 
 ### 5. Run feature-specific tests

@@ -8,7 +8,7 @@ stop mining and activate Proof-of-Stake.
 
 ## Background
 
-PIVX testnet switches from PoW to PoS at block `nFirstPoSBlock` (~201).
+PIVX testnet switches from PoW to PoS at block `UPGRADE_POS activation height` (~201).
 After this height, PoW blocks are no longer valid — the chain advances only
 through PoS block production by staking wallets.
 
@@ -163,6 +163,6 @@ See: **[docs/LIFECYCLE.md — Phase 5](../docs/LIFECYCLE.md#phase-5-masternode--
 
 BLS key generation command (run per-DMN-instance):
 ```bash
-pivx-cli -conf=/etc/pivx/<instance>/pivx.conf bls generate
+pivx-cli -conf=/etc/pivx/<instance>/pivx.conf generateblskeypair
 ```
 Fill in the `secret` value as `bls_operator_key` in the relevant `host_vars` file.
