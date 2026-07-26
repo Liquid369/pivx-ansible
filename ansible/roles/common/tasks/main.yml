@@ -113,7 +113,7 @@
     - host_ipv6_2 != (host_ipv6 | default(''))
   notify: netplan apply
 
-- name: Harden sshd — key-only login
+- name: Harden sshd to key-only login
   # 00- prefix: sshd first-match-wins, must sort before cloud-init's 50-*.conf
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/00-tn6-hardening.conf
@@ -125,8 +125,27 @@
     mode: "0644"
   notify: restart sshd
 
-# Allow rules are added BEFORE enabling ufw so a mid-play connection drop
-# can never lock us out of a box that only has VNC recovery.
+# pivxd logs to console so journald can feed vector/loki. rsyslog was
+# mirroring the whole journal into /var/log/syslog with no size cap
+# (215GB during the miner loop incident) while journald caps itself.
+- name: Disable rsyslog (journald is canonical, rsyslog duplicates unbounded)
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false    # image variants without rsyslog
+
+- name: Remove legacy rsyslog output files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/log/syslog
+    - /var/log/syslog.1
+
+# add allow rules before enabling ufw so a dropped connection mid-play
+# cant lock us out.
 - name: ufw - allow SSH
   community.general.ufw:
     rule: allow

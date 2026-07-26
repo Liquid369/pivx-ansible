@@ -6,10 +6,9 @@ This repository provisions and operates the active 10-server Contabo Testnet6
 fleet, with mixed IPv4, IPv6, and Tor masternode cohorts plus three colocated
 seed/bootstrap-miner instances for network startup.
 
-> Budget note: the forum proposal
-> ([testnet6 funds](https://forum.pivx.org/threads/testnet6-funds.2835/))
-> targets 15 servers. 10 were purchased in July 2026 due to pricing/budget;
-> scale to tn6-cb11..cb15 when funds allow.
+Budget note: the [forum proposal](https://forum.pivx.org/threads/testnet6-funds.2835/)
+targets 15 servers, 10 were purchased July 2026 due to pricing/budget.
+Scale to tn6-cb11..cb15 when funds allow.
 
 ---
 

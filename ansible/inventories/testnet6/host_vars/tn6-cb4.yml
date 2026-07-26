@@ -1,6 +1,6 @@
 # host_vars/tn6-cb4.yml
 #
-# Contabo Cloud VPS 8 (2026) — US St. Louis
+# Contabo Cloud VPS 8 (2026), US St. Louis
 # Plan class: contabo_8vcpu
 # 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor).
 #

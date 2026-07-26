@@ -1,14 +1,14 @@
 # Testnet6 Seed Nodes
 
-Candidate seed data for the `2026_testnet6` PIVX branch (PR not yet submitted).
-**Nothing is hardcoded in chainparams yet** — decision pending on fixed seeds
-vs. a DNS seeder behind a domain (e.g. the way `dnsseed.liquid369.wtf` serves
-mainnet). Both paths are prepared below.
+Candidate seed data for the 2026_testnet6 branch, PR not submitted yet.
+Nothing is hardcoded in chainparams yet, still deciding between fixed seeds
+and a DNS seeder behind a domain (same setup as dnsseed.liquid369.wtf on
+mainnet). Both lists below stay current either way.
 
-## Dedicated seeder instances (high-conn, always-on)
+## Dedicated seeder instances
 
-These run `maxconnections=256`, `dnsseed=0`, and are the bootstrap-mining
-wallets during Phase 2:
+These run maxconnections=256, dnsseed=0, and hold the bootstrap mining
+wallets for Phase 2:
 
 | Instance | Address | Region |
 |---|---|---|
@@ -16,12 +16,11 @@ wallets during Phase 2:
 | tn6-cb2-seed02 | `62.146.176.174:51534` | US St. Louis |
 | tn6-cb3-seed03 | `209.126.84.12:51534` | US St. Louis |
 
-## Option A — fixed seeds (`contrib/seeds/nodes_test.txt`)
+## Option A: fixed seeds (contrib/seeds/nodes_test.txt)
 
-`generate-seeds.py` consumes `<ip>:<port>` lines and emits the
-`chainparams_seed_test[]` array for `src/chainparamsseeds.h`. Candidate list
-(seeders + one v4 masternode slot per remaining host, default port entries
-listed first — servicebit filtering prefers them):
+generate-seeds.py takes ip:port lines and emits the chainparams_seed_test[]
+array for src/chainparamsseeds.h. Candidates, default-port entries first
+since servicebit filtering prefers them:
 
 ```
 169.58.75.147:51534
@@ -39,14 +38,15 @@ listed first — servicebit filtering prefers them):
 [2605:a141:2346:5865::1]:51494
 ```
 
-## Option B — DNS seeder behind a domain
+## Option B: DNS seeder behind a domain
 
-Point a testnet6 subdomain (e.g. `testnet.dnsseed.liquid369.wtf`) at a
-pivx-seeder crawler instance and replace the fuzzbawls entries in
-`CTestNetParams::vSeeds` when the PR is finalized. The crawler needs one of
-the seeder instances above as its bootstrap peer.
+Point a testnet6 subdomain (e.g. testnet-seed.<domain>) at a seeder crawler
+and swap the fuzzbawls entries out of CTestNetParams::vSeeds when the PR is
+finalized. The crawler bootstraps from one of the seeder instances above.
+Note the seed subdomain has to be NS delegated, it cannot sit behind the
+Cloudflare proxy.
 
-## Tor onion candidates (generated 2026-07-26, port 51514)
+## Tor onions (generated 2026-07-26, port 51514)
 
 ```
 27at7bsmh4r6ulamu33huyrrr23vd3ulaosckyaglgrimanp7ngxzaqd.onion:51514
@@ -54,6 +54,5 @@ ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion:51514
 u2gjinpoyfehafgl4ibmpkqxkuoz2gfw5zm5spirumjl2pyu5ghwzcad.onion:51514
 ```
 
-(tor-mn05 on cb1/cb2/cb3; all 18 onion addresses live in host_vars.
-`generate-seeds.py` accepts `<onion>.onion:<port>` lines directly if the
-fixed-seeds route is chosen.)
+tor-mn05 on cb1/cb2/cb3, all 18 onion addresses live in host_vars.
+generate-seeds.py accepts onion:port lines directly if we go fixed seeds.

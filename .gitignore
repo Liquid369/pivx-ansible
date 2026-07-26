@@ -40,3 +40,6 @@ debug_bundles/
 
 # OS
 Thumbs.db
+
+# Ansible local temp (ANSIBLE_LOCAL_TEMP)
+.ansible/

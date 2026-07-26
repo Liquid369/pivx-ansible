@@ -1,6 +1,6 @@
 # host_vars/tn6-cb7.yml
 #
-# Contabo Cloud VPS 6 (2026) — EU Nuremberg
+# Contabo Cloud VPS 6 (2026), EU Nuremberg
 # Plan class: contabo_6vcpu
 # 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor).
 #

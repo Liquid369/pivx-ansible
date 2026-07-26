@@ -4,8 +4,8 @@
 # Safe to run repeatedly.
 
 - name: Bootstrap all hosts
-  # Explicit fleet groups, NOT `all`: the explorers group (production mainnet
-  # explorer box) must never get ufw/hostname/netplan changes from this play.
+  # explicit groups instead of `all` so the explorer box never gets
+  # ufw/hostname/netplan changes from this play.
   hosts: masternodes:seeders:observers:monitoring
   become: true
   gather_facts: true

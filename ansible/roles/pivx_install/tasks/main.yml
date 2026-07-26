@@ -25,9 +25,9 @@
     group: "{{ pivx_group }}"
     system: true
     shell: /usr/sbin/nologin
-    # Must match roles/common exactly — a differing home makes the two roles
-    # flip-flop usermod, which fails (rc 8) once pivxd processes are running.
-    # /home is off-limits anyway: the systemd units set ProtectHome=true.
+    # keep in sync with roles/common, if they disagree usermod flip-flops
+    # every run and fails once pivxd is running. /home is blocked by
+    # ProtectHome=true in the units anyway.
     home: /var/lib/pivx
     create_home: true
     state: present

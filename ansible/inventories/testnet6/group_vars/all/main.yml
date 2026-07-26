@@ -23,9 +23,8 @@ lifecycle_phase: bootstrap_mining    # CHANGE as testnet progresses
 #   /opt/pivx/current              — symlink to active version
 #   /opt/pivx/current/bin/pivxd    — what systemd units use
 # ---------------------------------------------------------------------------
-# Testnet6 has a fresh genesis (2026_testnet6 branch) — official release
-# binaries will NOT start on it. We run builds of the branch published as
-# pre-releases on the Liquid369/PIVX fork until the PR lands upstream.
+# Testnet6 has a fresh genesis so official release binaries will not run.
+# We build from the 2026_testnet6 branch until the PR lands upstream.
 pivx_version: "5.6.99-tn6"
 pivx_releases_base: "/opt/pivx/releases"
 pivx_install_dir: "{{ pivx_releases_base }}/{{ pivx_version }}"
@@ -33,7 +32,7 @@ pivx_bin_dir: "{{ pivx_install_dir }}/bin"
 pivx_current_link: "/opt/pivx/current"     # symlink → active release
 pivx_symlink_dir: "/usr/local/bin"          # individual binary symlinks
 pivx_archive_url: "https://github.com/Liquid369/PIVX/releases/download/v{{ pivx_version }}/pivx-{{ pivx_version }}-x86_64-linux-gnu.tar.gz"
-pivx_checksum: "sha256:ef3096c50b2101b83b2ed137645394e4a7d62981b1c2b42757fb947fe4515b32"  # 5.6.99-tn6 @ e0fd11f41 (genesis fix)
+pivx_checksum: "sha256:9c20ff537db0997b047f076e654a16f3de7602541f3448ce936d37a9f0bf16c2"  # 5.6.99-tn6 with genesis fix, spork rotation, miner fix
 
 # ---------------------------------------------------------------------------
 # Sapling parameters
@@ -43,8 +42,8 @@ pivx_checksum: "sha256:ef3096c50b2101b83b2ed137645394e4a7d62981b1c2b42757fb947fe
 # Kept OUTSIDE /home because the pivxd systemd unit uses ProtectHome=true;
 # pivx.conf points at this path via paramsdir=.
 pivx_params_dir: "/var/lib/pivx/params"
-# PIVX loads only the two Sapling params (initZKSNARKS passes nullptr for
-# sprout) — do not add sprout-groth16.params, it is 725MB of zcashd-only data.
+# pivxd only loads sapling-spend and sapling-output, sprout-groth16 is
+# zcashd only (725MB), dont add it.
 pivx_sapling_params:
   - name: sapling-spend.params
     url: "https://download.z.cash/downloads/sapling-spend.params"
@@ -155,8 +154,8 @@ pivx_seed_nodes:
   - "169.58.75.147:51534"    # tn6-cb1-seed01 IPv4 (EU Nuremberg)
   - "62.146.176.174:51534"   # tn6-cb2-seed02 IPv4 (US St. Louis)
   - "209.126.84.12:51534"    # tn6-cb3-seed03 IPv4 (US St. Louis)
-  # Tor bootstrap points (tor-mn05 on cb1/cb2/cb3) — lets the tor cohort mesh
-  # natively; non-tor instances skip unroutable onion addnodes harmlessly.
+  # Tor bootstrap points (tor-mn05 on cb1/cb2/cb3) so the tor cohort can
+  # mesh natively, non-tor instances just skip onion addnodes.
   - "27at7bsmh4r6ulamu33huyrrr23vd3ulaosckyaglgrimanp7ngxzaqd.onion:51514"
   - "ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion:51514"
   - "u2gjinpoyfehafgl4ibmpkqxkuoz2gfw5zm5spirumjl2pyu5ghwzcad.onion:51514"
