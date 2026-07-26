@@ -1,28 +1,24 @@
 # host_vars/tn6-cb5.yml
 #
-# Active Contabo host for PIVX Testnet6.
-# Plan class: contabo_4vcpu
-# 6 PIVX masternode instances per host:
-#   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
-#   Slot 1  v4-mn02   IPv4 #2   P2P 51484 / RPC 51488
-#   Slot 2  v6-mn03   IPv6 #1   P2P 51494 / RPC 51498
-#   Slot 3  v6-mn04   IPv6 #2   P2P 51504 / RPC 51508
-#   Slot 4  tor-mn05  Tor  #1   P2P 51514 / RPC 51518
-#   Slot 5  tor-mn06  Tor  #2   P2P 51524 / RPC 51528
+# Contabo Cloud VPS 8 (2026) — EU Nuremberg
+# Plan class: contabo_8vcpu
+# 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor) + colocated observer (slot 6).
 #
-# IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
+# NOTE: Contabo provides a single IPv4 per VPS. mn02 shares the IPv4 on a
+# different P2P port (valid for testnet DMNs: uniqueness is on ip:port).
+# The IPv6 /64 provides ::1 (stock) and ::2 (added via netplan drop-in).
 
 provider: contabo
-provider_plan: contabo_4vcpu
+provider_plan: contabo_8vcpu
 chaos_group: chaos_contabo
-node_role: masternode
+node_role: mixed_masternode_observer
 host_label: tn6-cb5
-pivx_instances_expected: 6
+pivx_instances_expected: 7
 
-host_ipv4:   "203.0.113.15"    # REPLACE_ME
-host_ipv4_2: "203.0.113.115"    # REPLACE_ME  (second public IPv4 / failover IP)
-host_ipv6:   "2001:db8:cb::51"    # REPLACE_ME
-host_ipv6_2: "2001:db8:cb::52"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
+host_ipv4:   "169.58.75.146"
+host_ipv4_2: "169.58.75.146"    # single IPv4 — shared, mn02 uses port 51484
+host_ipv6:   "2a02:c207:2346:5867::1"
+host_ipv6_2: "2a02:c207:2346:5867::2"   # added by common role netplan drop-in
 
 # Firewall: open all PIVX P2P slots used by this host.
 ufw_pivx_ports:
@@ -32,6 +28,14 @@ ufw_pivx_ports:
   - "{{ pivx_p2p_port_base + 30 }}"
   - "{{ pivx_p2p_port_base + 40 }}"
   - "{{ pivx_p2p_port_base + 50 }}"
+  - "{{ pivx_p2p_port_base + 60 }}"
+
+# Monitoring stack — ports for firewall
+monitoring_exposed_ports:
+  - 9090    # Prometheus
+  - 3000    # Grafana
+  - 3100    # Loki
+  - 9093    # Alertmanager
 
 pivx_instances:
 
@@ -127,7 +131,7 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb5-tor-mn05/hostname
+    onion_address: "2j6le3f2yunxqcwmf2e4oqaxdt2jlqnj3xtxzxvl5jgzcc6nsrsum7ad.onion"
     onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb5-tor-mn05"
     p2p_port: 51514
     rpc_port: 51518
@@ -150,7 +154,7 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb5-tor-mn06/hostname
+    onion_address: "7wmdsppcivjtb2c5rkbe6vobg44jl4jnh2amsypqepua6e5ramfmnyqd.onion"
     onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb5-tor-mn06"
     p2p_port: 51524
     rpc_port: 51528
@@ -164,3 +168,26 @@ pivx_instances:
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
+
+  - name: tn6-cb5-obs01
+    enabled: true
+    slot: 6
+    protocol_class: ipv4
+    cohort: ipv4
+    role: observer
+    bind_addr: "{{ host_ipv4 }}"
+    external_ip: "{{ host_ipv4 }}"
+    p2p_port: 51534
+    rpc_port: 51538
+    rpc_user: rpc_obs01
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb5-obs01"
+    logdir: "/var/log/pivx/tn6-cb5-obs01"
+    confdir: "/etc/pivx/tn6-cb5-obs01"
+    mining_enabled: false
+    staking_enabled: false
+    masternode_enabled: false
+    bls_operator_key: ""
+    extra_conf:
+      - "txindex=1"
+      - "maxconnections=64"

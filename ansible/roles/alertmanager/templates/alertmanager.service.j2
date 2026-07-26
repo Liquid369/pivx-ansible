@@ -10,7 +10,8 @@ Group=alertmanager
 ExecStart=/usr/local/bin/alertmanager \
   --config.file=/etc/alertmanager/alertmanager.yml \
   --storage.path=/var/lib/alertmanager \
-  --web.listen-address=:{{ alertmanager_port }}
+  --web.listen-address=:{{ alertmanager_port }} \
+  --cluster.listen-address=
 Restart=on-failure
 ReadWritePaths=/var/lib/alertmanager
 

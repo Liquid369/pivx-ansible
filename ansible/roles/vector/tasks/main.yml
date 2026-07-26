@@ -15,7 +15,8 @@
 
 - name: Download Vector .deb package
   ansible.builtin.get_url:
-    url: https://packages.timber.io/vector/debian/pool/main/v/vector/vector_{{ _vector_version }}-1_amd64.deb
+    # packages.timber.io was decommissioned after Datadog acquired Vector
+    url: https://github.com/vectordotdev/vector/releases/download/v{{ _vector_version }}/vector_{{ _vector_version }}-1_amd64.deb
     dest: "/tmp/vector_{{ _vector_version }}_amd64.deb"
     # set vector_checksum ("sha256:<hash>") to verify; empty skips
     checksum: "{{ vector_checksum | default(omit, true) }}"

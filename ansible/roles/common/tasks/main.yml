@@ -93,12 +93,40 @@
     state: present
     reload: true
 
-- name: Configure ufw defaults
-  community.general.ufw:
-    state: enabled
-    policy: deny
-    direction: incoming
+- name: Configure secondary IPv6 address (netplan drop-in)
+  # Contabo images configure only ::1 from the /64. The v6-mn04 instance
+  # binds ::2, which we persist here and activate via `netplan apply`.
+  ansible.builtin.copy:
+    dest: /etc/netplan/60-pivx-ipv6.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          {{ ansible_default_ipv4.interface }}:
+            addresses:
+              - "{{ host_ipv6_2 }}/64"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - host_ipv6_2 is defined
+    - host_ipv6_2 != (host_ipv6 | default(''))
+  notify: netplan apply
 
+- name: Harden sshd — key-only login
+  # 00- prefix: sshd first-match-wins, must sort before cloud-init's 50-*.conf
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-tn6-hardening.conf
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart sshd
+
+# Allow rules are added BEFORE enabling ufw so a mid-play connection drop
+# can never lock us out of a box that only has VNC recovery.
 - name: ufw - allow SSH
   community.general.ufw:
     rule: allow
@@ -111,6 +139,12 @@
     port: "{{ item }}"
     proto: tcp
   loop: "{{ ufw_pivx_ports | default([]) }}"
+
+- name: Configure ufw defaults
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
 
 - name: Configure logrotate for pivx logs
   ansible.builtin.template:

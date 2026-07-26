@@ -1,29 +1,24 @@
 # host_vars/tn6-cb2.yml
 #
-# Active Contabo host for PIVX Testnet6.
-# Plan class: contabo_4vcpu
-# 6 PIVX masternode instances per host:
-#   Slot 0  v4-mn01   IPv4 #1   P2P 51474 / RPC 51478
-#   Slot 1  v4-mn02   IPv4 #2   P2P 51484 / RPC 51488
-#   Slot 2  v6-mn03   IPv6 #1   P2P 51494 / RPC 51498
-#   Slot 3  v6-mn04   IPv6 #2   P2P 51504 / RPC 51508
-#   Slot 4  tor-mn05  Tor  #1   P2P 51514 / RPC 51518
-#   Slot 5  tor-mn06  Tor  #2   P2P 51524 / RPC 51528
-# This host also runs a seeder/bootstrap-miner instance in slot 6.
+# Contabo Cloud VPS 8 (2026) — US St. Louis
+# Plan class: contabo_8vcpu
+# 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor) + colocated seed02/bootstrap-miner (slot 6).
 #
-# IMPORTANT: Replace ALL REPLACE_ME / RFC 5737 / RFC 3849 placeholder values.
+# NOTE: Contabo provides a single IPv4 per VPS. mn02 shares the IPv4 on a
+# different P2P port (valid for testnet DMNs: uniqueness is on ip:port).
+# The IPv6 /64 provides ::1 (stock) and ::2 (added via netplan drop-in).
 
 provider: contabo
-provider_plan: contabo_4vcpu
+provider_plan: contabo_8vcpu
 chaos_group: chaos_contabo
 node_role: mixed_masternode_seeder
 host_label: tn6-cb2
 pivx_instances_expected: 7
 
-host_ipv4:   "203.0.113.12"    # REPLACE_ME
-host_ipv4_2: "203.0.113.112"    # REPLACE_ME  (second public IPv4 / failover IP)
-host_ipv6:   "2001:db8:cb::21"    # REPLACE_ME
-host_ipv6_2: "2001:db8:cb::22"    # REPLACE_ME  (second IPv6 from /56 or /64 allocation)
+host_ipv4:   "62.146.176.174"
+host_ipv4_2: "62.146.176.174"    # single IPv4 — shared, mn02 uses port 51484
+host_ipv6:   "2605:a140:2346:5863::1"
+host_ipv6_2: "2605:a140:2346:5863::2"   # added by common role netplan drop-in
 
 # Firewall: open all PIVX P2P slots used by this host.
 ufw_pivx_ports:
@@ -129,7 +124,7 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb2-tor-mn05/hostname
+    onion_address: "ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion"
     onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb2-tor-mn05"
     p2p_port: 51514
     rpc_port: 51518
@@ -152,7 +147,7 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: ""          # FILL IN after: cat /var/lib/tor/pivx_hs/tn6-cb2-tor-mn06/hostname
+    onion_address: "k5q4d3edrpipl6tc4ky4g27vnuge23qutpkjxbcxkocb4bbet2zf3fyd.onion"
     onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb2-tor-mn06"
     p2p_port: 51524
     rpc_port: 51528

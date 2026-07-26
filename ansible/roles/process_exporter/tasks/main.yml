@@ -10,7 +10,7 @@
 
 - name: Download process-exporter
   ansible.builtin.get_url:
-    url: "https://github.com/ncabatoff/process-exporter/releases/download/v{{ process_exporter_version }}/process-exporter_{{ process_exporter_version }}_linux_amd64.tar.gz"
+    url: "https://github.com/ncabatoff/process-exporter/releases/download/v{{ process_exporter_version }}/process-exporter-{{ process_exporter_version }}.linux-amd64.tar.gz"
     dest: "/tmp/process-exporter-{{ process_exporter_version }}.tar.gz"
     mode: "0644"
   when: not pe_bin.stat.exists
@@ -20,12 +20,12 @@
     src: "/tmp/process-exporter-{{ process_exporter_version }}.tar.gz"
     dest: /tmp/
     remote_src: true
-    creates: "/tmp/process-exporter_{{ process_exporter_version }}_linux_amd64/process-exporter"
+    creates: "/tmp/process-exporter-{{ process_exporter_version }}.linux-amd64/process-exporter"
   when: not pe_bin.stat.exists
 
 - name: Install process-exporter binary
   ansible.builtin.copy:
-    src: "/tmp/process-exporter_{{ process_exporter_version }}_linux_amd64/process-exporter"
+    src: "/tmp/process-exporter-{{ process_exporter_version }}.linux-amd64/process-exporter"
     dest: /usr/local/bin/process-exporter
     owner: root
     group: root

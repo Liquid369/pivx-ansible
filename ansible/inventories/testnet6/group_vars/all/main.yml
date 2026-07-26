@@ -23,14 +23,17 @@ lifecycle_phase: bootstrap_mining    # CHANGE as testnet progresses
 #   /opt/pivx/current              — symlink to active version
 #   /opt/pivx/current/bin/pivxd    — what systemd units use
 # ---------------------------------------------------------------------------
-pivx_version: "5.6.1"
+# Testnet6 has a fresh genesis (2026_testnet6 branch) — official release
+# binaries will NOT start on it. We run builds of the branch published as
+# pre-releases on the Liquid369/PIVX fork until the PR lands upstream.
+pivx_version: "5.6.99-tn6"
 pivx_releases_base: "/opt/pivx/releases"
 pivx_install_dir: "{{ pivx_releases_base }}/{{ pivx_version }}"
 pivx_bin_dir: "{{ pivx_install_dir }}/bin"
 pivx_current_link: "/opt/pivx/current"     # symlink → active release
 pivx_symlink_dir: "/usr/local/bin"          # individual binary symlinks
-pivx_archive_url: "https://github.com/PIVX-Project/PIVX/releases/download/v{{ pivx_version }}/pivx-{{ pivx_version }}-x86_64-linux-gnu.tar.gz"
-pivx_checksum: "sha256:REPLACE_ME"  # REPLACE: fetch from v5.6.1 sha256sums.txt on GitHub releases
+pivx_archive_url: "https://github.com/Liquid369/PIVX/releases/download/v{{ pivx_version }}/pivx-{{ pivx_version }}-x86_64-linux-gnu.tar.gz"
+pivx_checksum: "sha256:ef3096c50b2101b83b2ed137645394e4a7d62981b1c2b42757fb947fe4515b32"  # 5.6.99-tn6 @ e0fd11f41 (genesis fix)
 
 # ---------------------------------------------------------------------------
 # Sapling parameters
@@ -40,6 +43,8 @@ pivx_checksum: "sha256:REPLACE_ME"  # REPLACE: fetch from v5.6.1 sha256sums.txt 
 # Kept OUTSIDE /home because the pivxd systemd unit uses ProtectHome=true;
 # pivx.conf points at this path via paramsdir=.
 pivx_params_dir: "/var/lib/pivx/params"
+# PIVX loads only the two Sapling params (initZKSNARKS passes nullptr for
+# sprout) — do not add sprout-groth16.params, it is 725MB of zcashd-only data.
 pivx_sapling_params:
   - name: sapling-spend.params
     url: "https://download.z.cash/downloads/sapling-spend.params"
@@ -47,9 +52,6 @@ pivx_sapling_params:
   - name: sapling-output.params
     url: "https://download.z.cash/downloads/sapling-output.params"
     checksum: "sha256:2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4"
-  - name: sprout-groth16.params
-    url: "https://download.z.cash/downloads/sprout-groth16.params"
-    checksum: "sha256:b685d700c60328498fbde589c8c7c484c722b788b265b72af448a5bf0ee55b50"
 
 # ---------------------------------------------------------------------------
 # PIVX network / chain identity
@@ -85,8 +87,9 @@ process_exporter_port: 9256
 vector_port: 8686                # Vector API / metrics port
 
 # Monitoring host — the Prometheus/Grafana/Loki stack target
-monitoring_host: tn6-infra01
-loki_endpoint: "http://{{ hostvars['tn6-infra01']['ansible_host'] }}:3100"
+# (colocated on tn6-cb5 until a dedicated infra host is funded)
+monitoring_host: tn6-cb5
+loki_endpoint: "http://{{ hostvars['tn6-cb5']['ansible_host'] }}:3100"
 prometheus_remote_write_url: ""  # optional; leave blank for local only
 
 # ---------------------------------------------------------------------------
@@ -149,10 +152,14 @@ chain_wipe_keep_tor_keys: true            # preserve Tor HS private keys across 
 # Both v4 and onion seeds are supported.
 # ---------------------------------------------------------------------------
 pivx_seed_nodes:
-  - "203.0.113.11:51534"     # tn6-cb1-seed01 IPv4 — REPLACE
-  - "203.0.113.12:51534"     # tn6-cb2-seed02 IPv4 — REPLACE
-  - "203.0.113.13:51534"     # tn6-cb3-seed03 IPv4 — REPLACE
-  # - "<seed01.onion>:51534" # Add Tor seeds once HS addresses are known
+  - "169.58.75.147:51534"    # tn6-cb1-seed01 IPv4 (EU Nuremberg)
+  - "62.146.176.174:51534"   # tn6-cb2-seed02 IPv4 (US St. Louis)
+  - "209.126.84.12:51534"    # tn6-cb3-seed03 IPv4 (US St. Louis)
+  # Tor bootstrap points (tor-mn05 on cb1/cb2/cb3) — lets the tor cohort mesh
+  # natively; non-tor instances skip unroutable onion addnodes harmlessly.
+  - "27at7bsmh4r6ulamu33huyrrr23vd3ulaosckyaglgrimanp7ngxzaqd.onion:51514"
+  - "ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion:51514"
+  - "u2gjinpoyfehafgl4ibmpkqxkuoz2gfw5zm5spirumjl2pyu5ghwzcad.onion:51514"
 
 # ---------------------------------------------------------------------------
 # Logging labels (common; instances add their own below)

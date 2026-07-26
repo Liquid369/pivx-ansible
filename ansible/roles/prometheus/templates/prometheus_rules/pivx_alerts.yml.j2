@@ -210,7 +210,7 @@ groups:
           severity: critical
         annotations:
           summary: "Prometheus itself is down"
-          description: "Prometheus on tn6-infra01 is not scraping."
+          description: "Prometheus on {{ monitoring_host }} is not scraping."
 
       - alert: LokiDown
         expr: up{job="loki"} == 0
@@ -228,4 +228,4 @@ groups:
           severity: warning
         annotations:
           summary: "Alertmanager is down — alerts will not route"
-          description: "Alertmanager on tn6-infra01 is not responding."
+          description: "Alertmanager on {{ monitoring_host }} is not responding."

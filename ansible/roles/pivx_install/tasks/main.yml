@@ -25,7 +25,10 @@
     group: "{{ pivx_group }}"
     system: true
     shell: /usr/sbin/nologin
-    home: "/home/{{ pivx_user }}"
+    # Must match roles/common exactly — a differing home makes the two roles
+    # flip-flop usermod, which fails (rc 8) once pivxd processes are running.
+    # /home is off-limits anyway: the systemd units set ProtectHome=true.
+    home: /var/lib/pivx
     create_home: true
     state: present
 
@@ -85,7 +88,6 @@
     - pivxd
     - pivx-cli
     - pivx-tx
-    - sapling-fetch-params
   when: not pivxd_stat.stat.exists
 
 - name: Clean up downloaded archive
@@ -118,7 +120,6 @@
     - pivxd
     - pivx-cli
     - pivx-tx
-    - sapling-fetch-params
 
 # ---------------------------------------------------------------------------
 # Sapling parameters (required before pivxd will start)

@@ -2,9 +2,14 @@
 
 Ansible-managed deployment scaffold for the **PIVX Testnet6 quorum testing environment**.
 
-This repository provisions and operates the active 15-server Contabo Testnet6
+This repository provisions and operates the active 10-server Contabo Testnet6
 fleet, with mixed IPv4, IPv6, and Tor masternode cohorts plus three colocated
 seed/bootstrap-miner instances for network startup.
+
+> Budget note: the forum proposal
+> ([testnet6 funds](https://forum.pivx.org/threads/testnet6-funds.2835/))
+> targets 15 servers. 10 were purchased in July 2026 due to pricing/budget;
+> scale to tn6-cb11..cb15 when funds allow.
 
 ---
 
@@ -47,23 +52,24 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
 
 ## Host Fleet Summary
 
-| Alias range     | Provider | Plan class | Role(s) |
-|-----------------|----------|------------|---------|
-| tn6-cb1..cb3    | Contabo  | 4 vCPU     | 6 masternodes + 1 seeder/bootstrap-miner each |
-| tn6-cb4..cb7    | Contabo  | 4 vCPU     | 6 masternodes each |
-| tn6-cb8..cb15   | Contabo  | 6 vCPU     | 6 masternodes each |
-| tn6-infra01     | Contabo  | small/ops  | observer + monitoring |
+| Alias range     | Provider | Plan class          | Role(s) |
+|-----------------|----------|---------------------|---------|
+| tn6-cb1..cb3    | Contabo  | VPS 8 (8c/24G)      | 6 masternodes + 1 seeder/bootstrap-miner each |
+| tn6-cb4         | Contabo  | VPS 8 (8c/24G)      | 6 masternodes |
+| tn6-cb5         | Contabo  | VPS 8 (8c/24G)      | 6 masternodes + observer + monitoring stack |
+| tn6-cb6..cb10   | Contabo  | VPS 6 (6c/12G)      | 6 masternodes each |
 
 Active fleet totals:
 
-- 15 Contabo masternode servers: 7 smaller 4 vCPU nodes and 8 larger 6 vCPU nodes
-- 90 masternode instances: 30 IPv4, 30 IPv6, 30 Tor
+- 10 Contabo servers: 5 Cloud VPS 8 and 5 Cloud VPS 6 (2026 plans)
+- 60 masternode instances: 20 IPv4, 20 IPv6, 20 Tor
 - 3 colocated seeder/bootstrap-miner instances on `tn6-cb1..tn6-cb3`
-- 1 observer instance on `tn6-infra01`
+- 1 observer + monitoring stack colocated on `tn6-cb5`
+- Regions: EU Nuremberg (5), US St. Louis (3), US Seattle (2)
 
-OVH/Kimsufi KS-A is documented as a future expansion target. The active
-`provider_ovh` inventory group is intentionally empty until those servers are
-purchased.
+Expansion to the full 15-host forum layout (tn6-cb11..cb15, and/or OVH/Kimsufi)
+is planned when budget allows. The `provider_ovh` inventory group is
+intentionally empty until those servers are purchased.
 
 ---
 

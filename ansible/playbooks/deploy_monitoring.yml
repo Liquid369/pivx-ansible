@@ -1,6 +1,6 @@
 ---
 # playbooks/deploy_monitoring.yml
-# Deploys the full observability stack to tn6-infra01,
+# Deploys the full observability stack to the monitoring group host,
 # and installs node_exporter + Vector on every fleet host.
 
 - name: Install node_exporter on all fleet hosts
