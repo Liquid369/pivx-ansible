@@ -131,7 +131,7 @@ mining_phase_target_height: 201
 # Enabled during Phase 3 on nodes that hold testnet coins.
 # ---------------------------------------------------------------------------
 staking_enabled: false                    # set true per-host once transition begins
-staking_min_confirmations: 200            # minimum confirmations before a UTXO stakes
+staking_min_confirmations: 100            # nStakeMinDepth on testnet6
 
 # ---------------------------------------------------------------------------
 # Masternode / quorum settings
@@ -139,9 +139,10 @@ staking_min_confirmations: 200            # minimum confirmations before a UTXO 
 #   LLMQ_50_60 = 1  (size 50, minSize 40, threshold 30, DKG every 60 blocks)
 #   LLMQ_400_60 = 2 / LLMQ_400_85 = 3  (impossible with a 60-90 MN fleet)
 #   LLMQ_TEST = 100 (size 3 — regtest-style, only if Testnet6 params add it)
-# NOTE: stock testnet params set llmqTypeChainLocks = LLMQ_400_60. Testnet6
-# chainparams MUST remap chainlocks to LLMQ_50_60 (or a custom small LLMQ)
-# or chainlocks will never form with this fleet size.
+# llmqTypeChainLocks is LLMQ_50_60 on the 2026_testnet6 branch: size 50,
+# minSize 40, threshold 30. With 60 masternodes that forms, with a margin of
+# 20. Drop below 40 live masternodes and chainlocks stop, which is a useful
+# chaos target but means cohort-stop needs watching.
 # ---------------------------------------------------------------------------
 masternode_enabled: false                 # set true per-instance once MN reg is done
 # legacy until UPGRADE_V6_0 (block 5000), deterministic after. Special txs are
