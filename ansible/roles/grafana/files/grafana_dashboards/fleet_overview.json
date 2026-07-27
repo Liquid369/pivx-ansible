@@ -115,7 +115,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Targets Down",
+      "title": "Hosts Down",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -128,7 +128,7 @@
       },
       "targets": [
         {
-          "expr": "count(up == 0) or vector(0)",
+          "expr": "count(count by (instance) (up{job=\"node_exporter\"} == 0)) or vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
