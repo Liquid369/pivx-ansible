@@ -13,8 +13,17 @@ branch, not estimated.
 | PoS activation | `UPGRADE_POS` | 201 |
 | v6.0 / deterministic MNs | `UPGRADE_V6_0` | 5000 |
 
-The PoW window pays about 49.75M PIV over blocks 2-200. 60 masternodes need
-600,000, so three blocks covers the lot. Funding is not a constraint here.
+Blocks 2-200 is 199 blocks at 250,000, so 49,750,000 PIV, plus block 1's
+60,001. The miner keeps all of it: no masternode exists that early so
+FillBlockPayee finds no payee and the whole block value lands on one output.
+Register legacy masternodes mid-window and they take 3 PIV a block, which
+does not move the total.
+
+60 masternodes need 600,000, about 1.2% of that. Funding is not a constraint.
+
+Mine the full 200 though. Block 200 pays 250,000 and block 201 pays 250, then
+5 after ZC_V2 and 10 after V5_5. Nearly the whole supply comes from that one
+window and it does not come back.
 
 ## The part that actually constrains the schedule
 
