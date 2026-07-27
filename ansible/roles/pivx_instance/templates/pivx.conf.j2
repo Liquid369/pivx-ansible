@@ -93,19 +93,11 @@ debug={{ cat }}
 # LIFECYCLE PHASE: {{ lifecycle_phase }}
 # =============================================================================
 
-{% if (instance.mining_enabled | default(false)) and lifecycle_phase == 'bootstrap_mining' %}
-# --- Phase 2: Bootstrap Mining ---
-# This instance mines PoW blocks to bootstrap the chain. Rewards are paid to
-# this node's own wallet (there is no miningaddress option in this build —
-# GenerateBitcoins mines to vpwallets[0]). PoW ends at the UPGRADE_POS
-# activation height ({{ mining_phase_target_height | default(201) }} on testnet).
-# Mining is disabled when `make stop-bootstrap-mining` is run (Phase 3).
-gen=1
-genproclimit={{ bootstrap_mining_threads | default(1) }}
-{% else %}
-# Mining disabled (lifecycle_phase={{ lifecycle_phase }} or mining_enabled=false)
+# Bootstrap mining is driven by generatetoaddress from
+# make start-bootstrap-mining, not by the background miner thread. gen=1 would
+# have both running at once on the same instance, racing for the same height.
+# It is also the loop that filled the seeder disks before the miner fix.
 gen=0
-{% endif %}
 
 {% if instance.staking_enabled | default(false) %}
 # --- Phase 3+: Staking enabled ---

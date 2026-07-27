@@ -177,7 +177,7 @@ pivx_instances:
     datadir: "/var/lib/pivx/tn6-cb1-seed01"
     logdir: "/var/log/pivx/tn6-cb1-seed01"
     confdir: "/etc/pivx/tn6-cb1-seed01"
-    mining_enabled: false        # keep off until the miner fix is verified on one seed, old binary looped on invalid blocks and filled the disk
+    mining_enabled: true         # the one and only PoW miner, see pivx_bootstrap_miner
     staking_enabled: false       # can be flipped true in Phase 3
     masternode_enabled: false    # seeders are bootstrap peers, not DMNs
     bls_operator_key: ""

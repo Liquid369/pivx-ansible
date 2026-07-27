@@ -1,26 +1,19 @@
 ---
 # roles/pivx_bootstrap_miner/tasks/main.yml
 #
-# Activates CPU mining on all mining-enabled PIVX instances on this host.
+# Mines the PoW window with generatetoaddress. This build has neither
+# setgenerate nor getmininginfo, the only mining RPC is:
 #
-# PIVX testnet bootstrap mining:
-#   - The testnet begins at block 0 with PoW consensus.
-#   - Mining runs until UPGRADE_POS activates (height 201 in testnet
-#     chainparams); setgenerate then refuses with "PoW phase has ended".
-#   - PoW rewards are paid to the mining node's own wallet — there is no
-#     miningaddress option in this build (GenerateBitcoins → vpwallets[0]).
+#   generatetoaddress nblocks "address"
 #
-# This role is called from playbooks/lifecycle/start_bootstrap_mining.yml.
-# It uses the PIVX RPC `setgenerate` command to start/stop CPU mining.
+# which mines synchronously and returns the block hashes.
 #
-# Assumptions:
-#   - pivxd instances are already running (pivx_instance role applied first)
-#   - pivx.conf already has gen=1 (written by pivx_instance when
-#     mining_enabled=true and lifecycle_phase=bootstrap_mining)
-#   - The instance has a wallet (default wallet is created automatically);
-#     setgenerate is a wallet RPC and mines to it.
-#   - This role's start/stop actions are via RPC, for runtime control only.
-#     The config-level mining toggle (gen=) is controlled by lifecycle_phase.
+# Mining runs on ONE instance. Several seeders racing on the same height fork
+# the chain constantly, and those reorgs are not what we are trying to test.
+# The other seeders just sync.
+#
+# PoW only reaches mining_phase_target_height - 1. UPGRADE_POS activates at
+# 201 so block 201 has to be staked, not mined.
 
 - name: Gather mining-enabled instances on this host
   ansible.builtin.set_fact:
@@ -30,56 +23,92 @@
                         | selectattr('mining_enabled', 'equalto', true)
                         | list }}
 
-- name: Show mining instances found
-  ansible.builtin.debug:
-    msg: "Mining-enabled instances on {{ inventory_hostname }}: {{ mining_instances | map(attribute='name') | list }}"
+- name: Nothing to do on this host
+  ansible.builtin.meta: end_host
+  when: mining_instances | length == 0
 
-# ---------------------------------------------------------------------------
-# Start mining via RPC
-# ---------------------------------------------------------------------------
-- name: Start CPU mining on each mining-enabled instance
+- name: Refuse to mine from more than one instance on a host
+  ansible.builtin.assert:
+    that: mining_instances | length == 1
+    msg: >-
+      {{ inventory_hostname }} has {{ mining_instances | length }} instances with
+      mining_enabled. Concurrent miners fork the chain. Leave exactly one.
+
+- name: Set the miner instance
+  ansible.builtin.set_fact:
+    miner: "{{ mining_instances | first }}"
+
+- name: Read current height
   ansible.builtin.command:
     argv:
       - "/opt/pivx/current/bin/pivx-cli"
-      - "-conf={{ item.confdir }}/pivx.conf"
-      - "-datadir={{ item.datadir }}"
-      - "setgenerate"
-      - "true"
-      - "{{ item.bootstrap_mining_threads | default(bootstrap_mining_threads) | string }}"
-  loop: "{{ mining_instances }}"
-  loop_control:
-    label: "{{ item.name }}"
-  register: setgen_result
-  changed_when: true   # RPC calls are always "changed" conceptually
-  failed_when: setgen_result.rc != 0
-
-- name: Show setgenerate results
-  ansible.builtin.debug:
-    msg: "[{{ item.item.name }}] setgenerate: {{ item.stdout | default('ok') }}"
-  loop: "{{ setgen_result.results }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-
-# ---------------------------------------------------------------------------
-# Verify mining is active (check mininginfo)
-# ---------------------------------------------------------------------------
-- name: Check mininginfo for each running miner
-  ansible.builtin.command:
-    argv:
-      - "/opt/pivx/current/bin/pivx-cli"
-      - "-conf={{ item.confdir }}/pivx.conf"
-      - "-datadir={{ item.datadir }}"
-      - "getmininginfo"
-  loop: "{{ mining_instances }}"
-  loop_control:
-    label: "{{ item.name }}"
-  register: mininginfo_result
+      - "-conf={{ miner.confdir }}/pivx.conf"
+      - "getblockcount"
+  register: height_now
   changed_when: false
-  failed_when: false
 
-- name: Show mining status
+- name: Work out how many blocks are left
+  ansible.builtin.set_fact:
+    pow_last_block: "{{ (mining_phase_target_height | int) - 1 }}"
+    blocks_needed: >-
+      {{ [((mining_phase_target_height | int) - 1) - (height_now.stdout | trim | int), 0] | max }}
+
+- name: Report
   ansible.builtin.debug:
-    msg: "[{{ item.item.name }}] mininginfo: {{ item.stdout }}"
-  loop: "{{ mininginfo_result.results }}"
+    msg: >-
+      {{ miner.name }} at height {{ height_now.stdout | trim }},
+      PoW ends at {{ pow_last_block }},
+      {{ blocks_needed }} blocks to mine
+
+- name: Already at the target
+  ansible.builtin.meta: end_host
+  when: blocks_needed | int == 0
+
+- name: Get a mining address from the miner wallet
+  # Rewards land here, so it has to be an address this instance controls. The
+  # collateral gets cut from this same wallet later.
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ miner.confdir }}/pivx.conf"
+      - "getnewaddress"
+      - "bootstrap-mining"
+  register: mine_addr
+  changed_when: false
+
+- name: Mine the remaining blocks
+  # generatetoaddress blocks until it returns. Batched so a single RPC call
+  # is not left hanging for the whole window, and so a partial run can be
+  # resumed by rerunning the play.
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ miner.confdir }}/pivx.conf"
+      - "generatetoaddress"
+      - "{{ bootstrap_mining_batch | default(25) | int }}"
+      - "{{ mine_addr.stdout | trim }}"
+  register: mine_batch
+  changed_when: true
+  loop: "{{ range(0, ((blocks_needed | int) / (bootstrap_mining_batch | default(25) | int)) | round(0, 'ceil') | int) | list }}"
   loop_control:
-    label: "{{ item.item.name }}"
+    label: "batch {{ item + 1 }}"
+
+- name: Confirm the height after mining
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ miner.confdir }}/pivx.conf"
+      - "getblockcount"
+  register: height_after
+  changed_when: false
+
+- name: Result
+  ansible.builtin.debug:
+    msg: >-
+      {{ miner.name }} now at height {{ height_after.stdout | trim }}
+      (PoW target {{ pow_last_block }}).
+      {% if (height_after.stdout | trim | int) < (pow_last_block | int) %}
+      Short of target, rerun make start-bootstrap-mining.
+      {% else %}
+      PoW window complete. Each coinbase matures 15 blocks after the block that made it.
+      {% endif %}
