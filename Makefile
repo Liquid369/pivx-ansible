@@ -50,7 +50,7 @@ PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $
 .PHONY: help \
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
         status check-inventory show-layout wallet-report consolidate \
-        upgrade-status prepare-switchover \
+        upgrade-status prepare-switchover create-collateral \
         start-bootstrap-mining stop-bootstrap-mining \
         verify-readiness transition-to-pos \
         enable-staking enable-masternodes \
@@ -190,6 +190,14 @@ check-inventory:
 ## Chain height against the staged activation schedule. Read-only.
 upgrade-status:
 	$(PLAYBOOK) ansible/playbooks/ops/upgrade_status.yml
+
+## Cut and lock masternode collateral. COUNT=<n> [COLLATERAL_HOST=..] [DRY_RUN=true]
+create-collateral:
+	@test -n "$(COUNT)" || (echo "ERROR: Set COUNT=<n>"; exit 1)
+	$(PLAYBOOK) ansible/playbooks/lifecycle/create_collateral.yml \
+	  -e "collateral_count=$(COUNT)" \
+	  $(if $(COLLATERAL_HOST),-e collateral_host=$(COLLATERAL_HOST),) \
+	  $(if $(DRY_RUN),-e dry_run=$(DRY_RUN),)
 
 ## Generate BLS keys and registration worksheets ahead of block 5000.
 prepare-switchover:

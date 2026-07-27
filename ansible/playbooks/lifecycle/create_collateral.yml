@@ -1,0 +1,151 @@
+---
+# playbooks/lifecycle/create_collateral.yml
+# Cut exact masternode collateral outputs on a seeder wallet, lock them, and
+# record the outpoints for the ProRegTx worksheet.
+#
+#   make create-collateral COUNT=60
+#   make create-collateral COUNT=60 COLLATERAL_HOST=tn6-cb1 DRY_RUN=true
+#
+# One sendmany with COUNT outputs of exactly 10000 PIV. Exact matters: the
+# ProRegTx collateral check rejects anything that is not nMNCollateralAmt, and
+# getmasternodeoutputs only reports outputs of that size.
+#
+# The same outputs serve the legacy masternodes now and the ProRegTx at v6,
+# so they are locked immediately. Staking or a consolidation sweep spending a
+# collateral would silently drop a masternode.
+
+- name: Create masternode collateral
+  hosts: "{{ collateral_host | default('seeders[0]') }}"
+  become: true
+  gather_facts: false
+
+  vars:
+    collateral_amount: 10000
+    seed_conf: "/etc/pivx/{{ collateral_instance }}/pivx.conf"
+
+  tasks:
+    - name: Require a count
+      ansible.builtin.assert:
+        that:
+          - collateral_count is defined
+          - collateral_count | int > 0
+        msg: "Set COUNT=<n>"
+
+    - name: Pick the seeder instance on this host
+      ansible.builtin.set_fact:
+        collateral_instance: >-
+          {{ (pivx_instances | selectattr('role', 'equalto', 'seeder') | list | first).name }}
+
+    - name: Read wallet state
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
+        echo "balance=$($C getbalance)"
+        echo "existing=$($C getmasternodeoutputs | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))')"
+      args:
+        executable: /bin/bash
+      register: wallet
+      changed_when: false
+
+    - name: Parse
+      ansible.builtin.set_fact:
+        wal_balance: "{{ (wallet.stdout_lines[0] | split('='))[1] | float }}"
+        wal_existing: "{{ (wallet.stdout_lines[1] | split('='))[1] | int }}"
+
+    - name: Show the plan
+      ansible.builtin.debug:
+        msg: >-
+          {{ collateral_instance }}: balance {{ wal_balance }} PIV,
+          {{ wal_existing }} collateral outputs already present,
+          asking for {{ collateral_count }} more
+          ({{ collateral_count | int * collateral_amount | int }} PIV)
+
+    - name: Refuse if the wallet cannot cover it
+      ansible.builtin.assert:
+        that: wal_balance | float >= (collateral_count | int * collateral_amount | int) + 1
+        msg: >-
+          Need {{ collateral_count | int * collateral_amount | int }} PIV plus fee,
+          wallet has {{ wal_balance }}. Mine more blocks or wait for coinbase
+          maturity (15 confirmations).
+
+    - name: Stop here on a dry run
+      ansible.builtin.meta: end_play
+      when: dry_run | default(false) | bool
+
+    - name: Cut the collateral outputs
+      # One tx, COUNT outputs of exactly 10000, change back to the wallet.
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
+        PAYLOAD=$(for i in $(seq 1 {{ collateral_count }}); do
+          $C getnewaddress "collateral-$i"
+        done | python3 -c '
+        import sys, json
+        addrs = [l.strip() for l in sys.stdin if l.strip()]
+        print(json.dumps({a: {{ collateral_amount }} for a in addrs}))
+        ')
+        $C sendmany "" "$PAYLOAD"
+      args:
+        executable: /bin/bash
+      register: sendmany_out
+
+    - name: Show the funding txid
+      ansible.builtin.debug:
+        msg: "collateral funding tx: {{ sendmany_out.stdout | trim }}"
+
+    - name: Wait for it to confirm and enumerate the outpoints
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
+        for i in $(seq 1 60); do
+          n=$($C getmasternodeoutputs | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))')
+          [ "$n" -ge "{{ collateral_count }}" ] && break
+          sleep 10
+        done
+        $C getmasternodeoutputs
+      args:
+        executable: /bin/bash
+      register: outputs_raw
+      changed_when: false
+
+    - name: Lock them so staking and sweeps cannot spend them
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
+        LOCKS=$(echo '{{ outputs_raw.stdout }}' | python3 -c '
+        import sys, json
+        outs = json.load(sys.stdin)
+        print(json.dumps([{"txid": o["txhash"], "vout": o["outputidx"]} for o in outs]))
+        ')
+        $C lockunspent false true "$LOCKS"
+      args:
+        executable: /bin/bash
+      register: lock_out
+      changed_when: true
+
+    - name: Write the outpoint list for the switchover worksheet
+      ansible.builtin.copy:
+        content: |
+          # masternode collateral outpoints
+          # host {{ inventory_hostname }} wallet {{ collateral_instance }}
+          # funding tx {{ sendmany_out.stdout | trim }}
+          #
+          # These are locked in the wallet. They back the legacy masternodes now
+          # and are reused as ProRegTx collateral at v6, no move needed.
+          #
+          # protx_register "<txhash>" <outputidx> "<ip:port>" "<owner>" \
+          #     "<blsPublic>" "<voting>" "<payout>"
+          {% for o in (outputs_raw.stdout | from_json) %}
+          {{ o.txhash }}:{{ o.outputidx }}
+          {% endfor %}
+        dest: "{{ playbook_dir }}/../../../switchover/collateral-{{ inventory_hostname }}.txt"
+        mode: "0640"
+      delegate_to: localhost
+      become: false
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: >-
+          {{ (outputs_raw.stdout | from_json) | length }} collateral outputs ready and locked.
+          Outpoints in switchover/collateral-{{ inventory_hostname }}.txt.
+          Unlock one with: pivx-cli lockunspent true true '[{"txid":"..","vout":N}]'
