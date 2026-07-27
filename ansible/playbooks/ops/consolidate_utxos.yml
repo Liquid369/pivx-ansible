@@ -1,0 +1,72 @@
+---
+# playbooks/ops/consolidate_utxos.yml
+# Sweep an instance's UTXOs back to one of its own addresses.
+#
+#   make consolidate INSTANCE=tn6-cb1-seed01
+#   make consolidate INSTANCE=tn6-cb1-seed01 CONSOLIDATE_MIN_UTXOS=50
+#
+# Staking and masternode rewards arrive as a steady drip of small outputs. Left
+# alone the wallet ends up with thousands of them, transactions grow, and a
+# 10000 PIV collateral input has to be assembled from hundreds of pieces. This
+# spends everything back to one address, replacing them with a single output.
+#
+# Locked collateral outputs are not touched: pivxd will not spend a UTXO that
+# backs a registered DMN.
+
+- name: Consolidate wallet UTXOs
+  hosts: masternodes:seeders:observers
+  become: true
+  gather_facts: false
+
+  vars:
+    consolidate_min_utxos: "{{ lookup('env', 'CONSOLIDATE_MIN_UTXOS') | default(20, true) | int }}"
+
+  tasks:
+    - name: Require an instance name
+      ansible.builtin.assert:
+        that: target_instance is defined
+        msg: "Set INSTANCE=<instance-name>"
+      run_once: true
+
+    - name: Find the instance on this host
+      ansible.builtin.set_fact:
+        inst: "{{ pivx_instances | selectattr('name', 'equalto', target_instance) | first | default({}) }}"
+
+    - name: Consolidate
+      when: inst.name is defined
+      block:
+        - name: Count current UTXOs
+          ansible.builtin.shell: |
+            set -o pipefail
+            /usr/local/bin/pivx-cli -conf={{ inst.confdir }}/pivx.conf listunspent \
+              | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))'
+          args:
+            executable: /bin/bash
+          register: utxo_count
+          changed_when: false
+
+        - name: Report and skip when there is nothing worth doing
+          ansible.builtin.debug:
+            msg: >-
+              {{ inst.name }} has {{ utxo_count.stdout | int }} UTXOs,
+              below the {{ consolidate_min_utxos }} threshold. Nothing to do.
+          when: (utxo_count.stdout | int) < (consolidate_min_utxos | int)
+
+        - name: Sweep everything to a single address
+          # sendtoaddress with subtract_fee=true sends the whole spendable
+          # balance, so no change output is left behind.
+          ansible.builtin.shell: |
+            set -o pipefail
+            C="/usr/local/bin/pivx-cli -conf={{ inst.confdir }}/pivx.conf"
+            ADDR=$($C getnewaddress consolidated)
+            BAL=$($C getbalance)
+            $C sendtoaddress "$ADDR" "$BAL" "consolidate" "" true
+          args:
+            executable: /bin/bash
+          register: sweep
+          when: (utxo_count.stdout | int) >= (consolidate_min_utxos | int)
+
+        - name: Show the consolidation txid
+          ansible.builtin.debug:
+            msg: "{{ inst.name }} consolidated {{ utxo_count.stdout }} UTXOs, txid {{ sweep.stdout | trim }}"
+          when: sweep is not skipped

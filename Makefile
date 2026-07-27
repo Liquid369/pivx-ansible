@@ -49,7 +49,7 @@ PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $
 
 .PHONY: help \
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
-        status check-inventory show-layout \
+        status check-inventory show-layout wallet-report consolidate \
         start-bootstrap-mining stop-bootstrap-mining \
         verify-readiness transition-to-pos \
         enable-staking enable-masternodes \
@@ -185,6 +185,15 @@ status:
 
 check-inventory:
 	$(PYTHON) scripts/validate_inventory.py $(INVENTORY)
+
+## Balances and UTXO shape per instance. Read-only.
+wallet-report:
+	$(PLAYBOOK) ansible/playbooks/ops/wallet_report.yml
+
+## consolidate INSTANCE=<name> [CONSOLIDATE_MIN_UTXOS=20]
+consolidate:
+	@test -n "$(INSTANCE)" || (echo "ERROR: Set INSTANCE=<instance-name>"; exit 1)
+	$(PLAYBOOK) ansible/playbooks/ops/consolidate_utxos.yml -e "target_instance=$(INSTANCE)"
 
 show-layout:
 	$(PYTHON) scripts/show_layout.py $(INVENTORY)

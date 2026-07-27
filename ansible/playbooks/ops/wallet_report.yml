@@ -1,0 +1,48 @@
+---
+# playbooks/ops/wallet_report.yml
+# Balance and UTXO shape for every instance. Read-only.
+#
+#   make wallet-report
+#   make wallet-report LIMIT=tn6-cb1
+#
+# UTXO count is the number that matters before a collateral run: each
+# protx_register_fund needs one input big enough for 10000 PIV plus fee, and a
+# wallet made of dust cannot produce one however large its balance.
+
+- name: Wallet report
+  hosts: masternodes:seeders:observers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Collect wallet state per instance
+      ansible.builtin.shell: |
+        set -o pipefail
+        /usr/local/bin/pivx-cli -conf={{ item.confdir }}/pivx.conf getwalletinfo 2>/dev/null \
+          | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["balance"], d.get("immature_balance",0), d["txcount"])' 2>/dev/null || echo "RPC_DOWN 0 0"
+        /usr/local/bin/pivx-cli -conf={{ item.confdir }}/pivx.conf listunspent 2>/dev/null \
+          | python3 -c '
+        import sys,json
+        u=json.load(sys.stdin)
+        spendable=[x for x in u if x["amount"] >= 10000]
+        print(len(u), len(spendable))
+        ' 2>/dev/null || echo "0 0"
+      args:
+        executable: /bin/bash
+      register: wallet_raw
+      changed_when: false
+      loop: "{{ pivx_instances | selectattr('enabled', 'defined') | selectattr('enabled') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Show wallet state
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.item.name }}:
+          balance={{ (item.stdout_lines[0] | default('? 0 0')).split()[0] }}
+          immature={{ (item.stdout_lines[0] | default('? 0 0')).split()[1] }}
+          utxos={{ (item.stdout_lines[1] | default('0 0')).split()[0] }}
+          collateral_ready_utxos={{ (item.stdout_lines[1] | default('0 0')).split()[1] }}
+      loop: "{{ wallet_raw.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
