@@ -174,7 +174,6 @@ make verify-readiness                   # detailed phase readiness poll
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Day-2 operational tasks |
 | [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) | Engineering assumptions |
 | [runbooks/MIGRATE_TO_V6_FEATURES.md](runbooks/MIGRATE_TO_V6_FEATURES.md) | Upgrade path from stable chain to v6 feature tests |
-| [REVIEW.md](REVIEW.md) | Blocking items + operator checklist |
 
 ---
 

@@ -43,3 +43,6 @@ Thumbs.db
 
 # Ansible local temp (ANSIBLE_LOCAL_TEMP)
 .ansible/
+
+# Working docs stay local
+REVIEW.md
