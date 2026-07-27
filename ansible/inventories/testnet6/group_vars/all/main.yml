@@ -144,6 +144,11 @@ staking_min_confirmations: 200            # minimum confirmations before a UTXO 
 # or chainlocks will never form with this fleet size.
 # ---------------------------------------------------------------------------
 masternode_enabled: false                 # set true per-instance once MN reg is done
+# legacy until UPGRADE_V6_0 (block 5000), deterministic after. Special txs are
+# rejected before 5000 and legacy dies at 5000, so the ProRegTx wave has to be
+# staged and fired at the cutover, not before.
+masternode_mode: legacy                   # legacy | deterministic
+v6_activation_height: 5000
 llmq_type: 1                              # LLMQ_50_60
 quorum_size: 50                           # llmq50_60.size (minSize 40 to form)
 

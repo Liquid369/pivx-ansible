@@ -115,13 +115,27 @@ staking=0
 {% endif %}
 
 {% if (instance.masternode_enabled | default(false)) and instance.role == 'masternode' %}
-# --- Phase 4: Masternode enabled (deterministic) ---
+{% set mn_mode = instance.mn_mode | default(masternode_mode) | default('deterministic') %}
+# --- Masternode enabled ({{ mn_mode }}) ---
+# Special transactions are rejected until UPGRADE_V6_0 (block 5000), and
+# legacy masternodes go obsolete at the same height. So a masternode runs
+# legacy first, then re-registers as deterministic once v6 is live. Flip
+# mn_mode on the instance (or masternode_mode fleet-wide) at the cutover.
 masternode=1
+{% if mn_mode == 'legacy' %}
+{% if instance.mn_legacy_privkey | default('') not in ['', 'REPLACE_ME'] %}
+masternodeprivkey={{ instance.mn_legacy_privkey }}
+{% else %}
+# masternodeprivkey= not set — generate with `pivx-cli createmasternodekey`
+# and fill mn_legacy_privkey in host_vars
+{% endif %}
+{% else %}
 {% if instance.bls_operator_key | default('') not in ['', 'REPLACE_ME'] %}
 mnoperatorprivatekey={{ instance.bls_operator_key }}
 {% else %}
 # mnoperatorprivatekey= not set — generate with `pivx-cli generateblskeypair`
 # and fill bls_operator_key in host_vars!
+{% endif %}
 {% endif %}
 {% endif %}
 
