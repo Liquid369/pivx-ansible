@@ -178,7 +178,12 @@ pivx_instances:
     logdir: "/var/log/pivx/tn6-cb1-seed01"
     confdir: "/etc/pivx/tn6-cb1-seed01"
     mining_enabled: true         # the one and only PoW miner, see pivx_bootstrap_miner
-    staking_enabled: false       # can be flipped true in Phase 3
+    # Must be on BEFORE the chain reaches 200. This wallet holds every PoW
+    # coinbase, so at 201 it is the only wallet with stakeable coins and the
+    # only thing that can produce the first PoS block. staking=0 here stalls
+    # the chain at 200 permanently. Harmless during PoW: nothing is stakeable
+    # until depth 100 and PoS blocks are rejected below 201 anyway.
+    staking_enabled: true
     masternode_enabled: false    # seeders are bootstrap peers, not DMNs
     bls_operator_key: ""
     extra_conf:

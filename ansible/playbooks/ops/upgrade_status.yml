@@ -52,6 +52,22 @@
         msg: "height {{ cur_height }}: every scheduled upgrade is active"
       when: pending_upgrades | length == 0
 
+    - name: Staking sanity before the PoS handover
+      # At 201 the only wallet with stakeable coins is the one holding the PoW
+      # coinbases (depth 100 means blocks 1-101 are eligible at tip 200). If it
+      # is not staking the chain stops at 200 and there is no PoW fallback,
+      # ConnectBlock rejects PoW at or above 201.
+      ansible.builtin.debug:
+        msg: >-
+          {% if (cur_height | int) < 201 %}
+          PoS handover at 201. Confirm the mining wallet has staking_enabled
+          before the tip reaches 200, and that its clock is NTP synced: block
+          200 may carry a timestamp up to 2h ahead and PoS cannot mint until
+          wall clock passes it.
+          {% else %}
+          past the PoS handover at 201
+          {% endif %}
+
     - name: Masternode mode sanity
       ansible.builtin.debug:
         msg: >-
