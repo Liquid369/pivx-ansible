@@ -1,0 +1,21 @@
+[Unit]
+Description=PIVX Testnet6 Daemon (explorer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart={{ explorer_pivx_install_dir }}/bin/pivxd -datadir={{ explorer_pivx_datadir }} -printtoconsole
+ExecStop={{ explorer_pivx_install_dir }}/bin/pivx-cli -datadir={{ explorer_pivx_datadir }} stop
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pivxd-testnet
+
+[Install]
+WantedBy=multi-user.target

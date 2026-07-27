@@ -1,0 +1,57 @@
+# host_vars/tn6-explorer01.yml
+#
+# Contabo Cloud VPS 30 NVMe, Hub Europe. 62.84.185.233.
+# This box runs the PRODUCTION mainnet PIVX explorer (rusty-blox + mainnet
+# pivxd, hand-built, NOT managed here). We add only a testnet6 stack alongside
+# it: a testnet pivxd and a second rusty-blox instance on separate ports and
+# data dirs. Nothing in the testnet_explorer role touches the mainnet services.
+
+provider: contabo
+host_label: tn6-explorer01
+
+# Testnet6 pivxd on this box (distinct from mainnet's 8049).
+explorer_pivx_datadir: /opt/coins/data/pivx-testnet/backend
+explorer_pivx_rpc_port: 51478
+explorer_pivx_p2p_port: 51474
+explorer_pivx_rpc_user: rpc_testnet_explorer
+explorer_pivx_rpc_password: "{{ vault_explorer_rpc_password }}"
+# Sapling params already present on the box from the mainnet install.
+explorer_pivx_params_dir: /root/.pivx-params
+explorer_pivx_install_dir: /opt/pivx-testnet
+
+# Second rusty-blox instance for testnet.
+# It gets its OWN binary and frontend copy. The mainnet explorer builds from
+# /root/rusty-blox on the analytics-recompute branch; sharing that path would
+# swap the production binary out from under it on any rebuild.
+explorer_rustyblox_workdir: /opt/rustyblox-testnet
+explorer_rustyblox_binary: /opt/rustyblox-testnet/bin/rustyblox
+explorer_rustyblox_frontend_dist: /opt/rustyblox-testnet/frontend/dist
+# Where the explorer source is built on the box. The play copies the binary
+# and frontend out of here; it does not build or check out anything itself.
+explorer_rustyblox_source_dir: /root/rusty-blox
+
+# The chain starts empty, so serve as soon as there is a block instead of
+# waiting for the 1000-block mainnet default.
+explorer_rustyblox_min_blocks: 1
+explorer_rustyblox_db_dir: /opt/coins/data/pivx-testnet/rustyblox
+explorer_rustyblox_port: 3006
+explorer_domain: testnet-explorer.liquid369.wtf
+
+# Existing cloudflared tunnel on the box (found during recon).
+explorer_cloudflared_tunnel: pivx-explorer
+explorer_cloudflared_tunnel_id: f8e1e17f-11a8-48de-bae6-2b7d6f9b66f7
+
+# process_exporter groups to track on this box (mainnet + testnet pivxd,
+# both rusty-blox instances). Matches by cmdline substring.
+process_exporter_process_names:
+  - name: "pivxd"
+    cmdline:
+      - "pivxd"
+  - name: "rustyblox"
+    cmdline:
+      - "rustyblox"
+
+# The exporters gate access with ufw, which is inactive on this production
+# box. deploy_explorer.yml adds iptables rules limiting 9100/9256 to the
+# monitoring host instead, so they are not publicly exposed.
+explorer_metrics_allow_ip: "{{ hostvars[monitoring_host]['ansible_host'] }}"

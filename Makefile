@@ -48,7 +48,7 @@ endif
 PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $(ANSIBLE_OPTS) $(LIMIT_FLAG)
 
 .PHONY: help \
-        bootstrap deploy deploy-pivx deploy-monitoring deploy-tor \
+        bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
         status check-inventory show-layout \
         start-bootstrap-mining stop-bootstrap-mining \
         verify-readiness transition-to-pos \
@@ -128,6 +128,12 @@ deploy-pivx:
 
 deploy-monitoring:
 	$(PLAYBOOK) ansible/playbooks/deploy_monitoring.yml
+
+## Testnet explorer stack on the explorer box (mainnet untouched).
+## Pass EXPLORER_BINARY=<path to pivx-<ver>-x86_64-linux-gnu.tar.gz>.
+deploy-explorer:
+	$(PLAYBOOK) ansible/playbooks/deploy_explorer.yml \
+	  $(if $(EXPLORER_BINARY),-e pivx_testnet_tarball=$(EXPLORER_BINARY),)
 
 deploy-tor:
 	$(PLAYBOOK) ansible/playbooks/deploy_tor.yml

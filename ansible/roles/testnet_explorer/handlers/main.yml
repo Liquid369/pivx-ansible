@@ -1,0 +1,21 @@
+---
+# roles/testnet_explorer/handlers/main.yml
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart testnet pivxd
+  ansible.builtin.systemd:
+    name: pivxd-testnet
+    state: restarted
+
+- name: restart testnet rustyblox
+  ansible.builtin.systemd:
+    name: rustyblox-testnet
+    state: restarted
+
+- name: restart cloudflared
+  ansible.builtin.systemd:
+    name: cloudflared
+    state: restarted

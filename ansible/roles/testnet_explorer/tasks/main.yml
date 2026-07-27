@@ -1,0 +1,207 @@
+---
+# roles/testnet_explorer/tasks/main.yml
+#
+# Stands up a testnet6 pivxd + a second rusty-blox instance on the explorer
+# box, ALONGSIDE the untouched production mainnet stack. Self-contained: it
+# never edits the mainnet pivxd, the mainnet rusty-blox, or their data.
+
+# ---------------------------------------------------------------------------
+# Testnet6 pivxd
+# ---------------------------------------------------------------------------
+- name: Install testnet PIVX binary directory
+  ansible.builtin.file:
+    path: "{{ explorer_pivx_install_dir }}/bin"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check if testnet pivxd already installed
+  ansible.builtin.stat:
+    path: "{{ explorer_pivx_install_dir }}/bin/pivxd"
+  register: tn_pivxd
+
+- name: Extract testnet PIVX binary (pre-staged tarball)
+  ansible.builtin.unarchive:
+    src: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    dest: "{{ explorer_pivx_install_dir }}/bin/"
+    remote_src: true
+    extra_opts:
+      - "--strip-components=2"
+      - "--wildcards"
+      - "*/bin/*"
+  when: not tn_pivxd.stat.exists
+
+- name: Create testnet data directory
+  ansible.builtin.file:
+    path: "{{ explorer_pivx_datadir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Write testnet pivx.conf
+  ansible.builtin.template:
+    src: pivx-testnet.conf.j2
+    dest: "{{ explorer_pivx_datadir }}/pivx.conf"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart testnet pivxd
+
+- name: Install testnet pivxd systemd unit
+  ansible.builtin.template:
+    src: pivxd-testnet.service.j2
+    dest: /etc/systemd/system/pivxd-testnet.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart testnet pivxd
+
+- name: Enable and start testnet pivxd
+  ansible.builtin.systemd:
+    name: pivxd-testnet
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for testnet pivxd RPC
+  ansible.builtin.command:
+    cmd: >-
+      {{ explorer_pivx_install_dir }}/bin/pivx-cli
+      -datadir={{ explorer_pivx_datadir }} getblockcount
+  register: tn_rpc
+  retries: 15
+  delay: 4
+  until: tn_rpc.rc == 0
+  changed_when: false
+
+# ---------------------------------------------------------------------------
+# Second rusty-blox instance (testnet)
+# ---------------------------------------------------------------------------
+- name: Create rusty-blox testnet directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ explorer_rustyblox_workdir }}"
+    - "{{ explorer_rustyblox_workdir }}/bin"
+    - "{{ explorer_rustyblox_frontend_dist }}"
+    - "{{ explorer_rustyblox_db_dir }}"
+
+# Own copy of the binary and frontend so a mainnet rebuild never swaps the
+# testnet instance out from under itself. Rebuild the source tree first, then
+# rerun this play to promote the new build to testnet.
+- name: Install the testnet rusty-blox binary
+  ansible.builtin.copy:
+    src: "{{ explorer_rustyblox_source_dir }}/target/release/rustyblox"
+    dest: "{{ explorer_rustyblox_binary }}"
+    remote_src: true
+    mode: "0755"
+  notify: restart testnet rustyblox
+
+- name: Install the testnet frontend
+  ansible.posix.synchronize:
+    src: "{{ explorer_rustyblox_source_dir }}/frontend/dist/"
+    dest: "{{ explorer_rustyblox_frontend_dist }}/"
+    delete: true
+  delegate_to: "{{ inventory_hostname }}"
+  notify: restart testnet rustyblox
+
+- name: Write rusty-blox testnet config
+  ansible.builtin.template:
+    src: rustyblox-testnet.config.toml.j2
+    dest: "{{ explorer_rustyblox_workdir }}/config.toml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart testnet rustyblox
+
+- name: Install rusty-blox testnet systemd unit
+  ansible.builtin.template:
+    src: rustyblox-testnet.service.j2
+    dest: /etc/systemd/system/rustyblox-testnet.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart testnet rustyblox
+
+- name: Enable and start rusty-blox testnet
+  ansible.builtin.systemd:
+    name: rustyblox-testnet
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# ---------------------------------------------------------------------------
+# Cloudflared ingress for the testnet explorer subdomain
+# This box's tunnel also serves the PRODUCTION mainnet explorer, so a bad
+# config must never reach a cloudflared restart. Back up, edit, validate, and
+# roll back on any failure before the service is touched.
+# ---------------------------------------------------------------------------
+- name: Configure cloudflared ingress safely
+  block:
+    - name: Back up cloudflared config
+      ansible.builtin.copy:
+        src: /etc/cloudflared/config.yml
+        dest: /etc/cloudflared/config.yml.tn6bak
+        remote_src: true
+        mode: "0600"
+
+    - name: Add testnet explorer ingress rule
+      ansible.builtin.blockinfile:
+        path: /etc/cloudflared/config.yml
+        marker: "  # {mark} ANSIBLE testnet-explorer"
+        insertbefore: '^\s*- service: http_status:404'
+        block: |2
+            - hostname: {{ explorer_domain }}
+              service: http://localhost:{{ explorer_rustyblox_port }}
+      register: cf_edit
+
+    - name: Validate the cloudflared config before restarting
+      ansible.builtin.command:
+        cmd: "cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate"
+      changed_when: false
+
+    - name: Restart cloudflared to pick up the new hostname
+      ansible.builtin.systemd:
+        name: cloudflared
+        state: restarted
+      when: cf_edit is changed
+
+  rescue:
+    - name: Restore the original cloudflared config
+      ansible.builtin.copy:
+        src: /etc/cloudflared/config.yml.tn6bak
+        dest: /etc/cloudflared/config.yml
+        remote_src: true
+        mode: "0600"
+
+    - name: Fail after rollback
+      ansible.builtin.fail:
+        msg: >-
+          cloudflared config validation failed; restored the original config
+          and left the tunnel untouched. Check config.yml manually.
+
+- name: Route the subdomain through the tunnel (creates the CNAME in Cloudflare)
+  ansible.builtin.command:
+    cmd: "cloudflared tunnel route dns {{ explorer_cloudflared_tunnel }} {{ explorer_domain }}"
+  register: cf_route
+  changed_when: "'added' in cf_route.stdout.lower() or 'created' in cf_route.stdout.lower()"
+  failed_when: false   # DNS may be managed by the operator; surfaced in the summary
+
+- name: Report the DNS route outcome
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Cloudflare CNAME for ' + explorer_domain + ' is set.'
+         if cf_route.rc == 0 or 'already' in (cf_route.stderr | default('') | lower)
+         else 'ACTION NEEDED: add a Cloudflare CNAME ' + explorer_domain
+              + ' -> ' + explorer_cloudflared_tunnel_id + '.cfargotunnel.com (DNS-only). '
+              + 'cloudflared said: ' + (cf_route.stderr | default('') | trim) }}

@@ -1,0 +1,26 @@
+[Unit]
+Description=Rusty-Blox PIVX Testnet6 explorer
+Documentation=https://github.com/Liquid369/rusty-blox
+After=network-online.target pivxd-testnet.service
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=4
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory={{ explorer_rustyblox_workdir }}
+ExecStart={{ explorer_rustyblox_binary }}
+Environment=HOME=/root
+Environment=RUST_LOG=info
+LimitNOFILE=65536
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rustyblox-testnet
+
+[Install]
+WantedBy=multi-user.target

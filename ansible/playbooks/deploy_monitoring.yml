@@ -3,8 +3,10 @@
 # Deploys the full observability stack to the monitoring group host,
 # and installs node_exporter + Vector on every fleet host.
 
-- name: Install node_exporter on all fleet hosts
-  hosts: all
+# Explicit fleet groups, NOT `all`: the explorers group is a production box
+# managed only by deploy_explorer.yml (it installs its own exporters there).
+- name: Install exporters and Vector on all fleet hosts
+  hosts: masternodes:seeders:observers:monitoring
   become: true
   gather_facts: true
 

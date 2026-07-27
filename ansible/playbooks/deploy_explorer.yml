@@ -1,0 +1,92 @@
+---
+# playbooks/deploy_explorer.yml
+# Testnet6 explorer stack on the (production mainnet) explorer box.
+# Targets ONLY the explorers group. Never touches the mainnet services.
+#
+# The testnet binary is not committed to the repo. Stage it first, e.g.:
+#   ansible explorers -m copy \
+#     -a "src=<path>/pivx-5.6.99-tn6-x86_64-linux-gnu.tar.gz \
+#         dest=/tmp/pivx-5.6.99-tn6.tar.gz mode=0644"
+# or pass -e pivx_testnet_tarball=<local path> to let this play copy it.
+
+- name: Deploy testnet explorer stack
+  hosts: explorers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Stage the testnet pivx binary (when a local path is provided)
+      ansible.builtin.copy:
+        src: "{{ pivx_testnet_tarball }}"
+        dest: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+        mode: "0644"
+      when: pivx_testnet_tarball is defined
+
+    - name: Confirm the binary tarball is present
+      ansible.builtin.stat:
+        path: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+      register: tn_tarball
+      failed_when: not tn_tarball.stat.exists
+
+  roles:
+    - node_exporter
+    - process_exporter
+
+  post_tasks:
+    # ufw is inactive on this box (production, hand-managed). Restrict the
+    # exporter ports to the monitoring host with iptables instead of exposing
+    # them to the internet. INPUT-chain only, so docker's chains are untouched.
+    - name: Allow monitoring host to reach the exporters
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        source: "{{ explorer_metrics_allow_ip }}"
+        jump: ACCEPT
+        action: insert
+        comment: "tn6 metrics allow {{ item }}"
+      loop:
+        - "{{ node_exporter_port }}"
+        - "{{ process_exporter_port }}"
+
+    - name: Drop all other access to the exporter ports
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        jump: DROP
+        action: append
+        comment: "tn6 metrics drop {{ item }}"
+      loop:
+        - "{{ node_exporter_port }}"
+        - "{{ process_exporter_port }}"
+
+    - name: Persist the exporter firewall rules across reboots
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tn6-metrics-firewall.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Restrict tn6 exporter ports to the monitoring host
+          After=network-online.target docker.service
+          [Service]
+          Type=oneshot
+          RemainAfterExit=true
+          ExecStart=/usr/sbin/iptables -I INPUT -p tcp --dport {{ node_exporter_port }} -s {{ explorer_metrics_allow_ip }} -j ACCEPT
+          ExecStart=/usr/sbin/iptables -I INPUT -p tcp --dport {{ process_exporter_port }} -s {{ explorer_metrics_allow_ip }} -j ACCEPT
+          ExecStart=/usr/sbin/iptables -A INPUT -p tcp --dport {{ node_exporter_port }} -j DROP
+          ExecStart=/usr/sbin/iptables -A INPUT -p tcp --dport {{ process_exporter_port }} -j DROP
+          [Install]
+          WantedBy=multi-user.target
+      # Rules are already applied live above; this only makes them survive a
+      # reboot. Enable but do not run now (would duplicate the live rules).
+
+    - name: Enable the exporter firewall unit for boot
+      ansible.builtin.systemd:
+        name: tn6-metrics-firewall
+        enabled: true
+        daemon_reload: true
+
+    - name: Deploy the testnet explorer stack
+      ansible.builtin.include_role:
+        name: testnet_explorer
