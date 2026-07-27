@@ -15,8 +15,8 @@ node_role: masternode
 host_label: tn6-cb4
 pivx_instances_expected: 6
 
-host_ipv4:   "66.94.119.202"
-host_ipv4_2: "66.94.119.202"    # single IPv4 — shared, mn02 uses port 51484
+host_ipv4:   "217.77.13.82"
+host_ipv4_2: "217.77.13.82"    # single IPv4 — shared, mn02 uses port 51484
 host_ipv6:   "2605:a140:2346:5862::1"
 host_ipv6_2: "2605:a140:2346:5862::2"   # added by common role netplan drop-in
 
