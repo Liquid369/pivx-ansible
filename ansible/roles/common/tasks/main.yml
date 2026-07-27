@@ -125,6 +125,16 @@
     mode: "0644"
   notify: restart sshd
 
+- name: Add team ssh keys
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ item.key }}"
+    comment: "{{ item.name }}"
+    state: present
+  loop: "{{ ops_ssh_keys | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 # pivxd logs to console so journald can feed vector/loki. rsyslog was
 # mirroring the whole journal into /var/log/syslog with no size cap
 # (215GB during the miner loop incident) while journald caps itself.

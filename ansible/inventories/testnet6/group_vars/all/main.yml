@@ -73,6 +73,15 @@ pivx_p2p_port_base: 51474       # testnet p2p default
 pivx_rpc_port_base: 51478       # testnet rpc default
 
 # ---------------------------------------------------------------------------
+# Team ssh keys
+# Managed by the common role, add or remove a line and rerun make bootstrap.
+# Password auth is off fleet wide so this list is the only door.
+# ---------------------------------------------------------------------------
+ops_ssh_keys:
+  - name: luke
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILZflFbb+iN4cUh4SwwABoMs95fz+TJ4a0atBytMtgig luke@lukehanslarsen.com"
+
+# ---------------------------------------------------------------------------
 # Systemd
 # ---------------------------------------------------------------------------
 pivx_systemd_service_template: "pivxd@.service"
