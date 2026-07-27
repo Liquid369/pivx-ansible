@@ -18,7 +18,7 @@
 #       ansible/playbooks/lifecycle/verify_phase_readiness.yml
 
 - name: "Verify fleet readiness for phase: {{ lifecycle_phase }}"
-  hosts: all
+  hosts: masternodes:seeders:observers
   become: true
   gather_facts: false
 

@@ -50,6 +50,7 @@ PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $
 .PHONY: help \
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
         status check-inventory show-layout wallet-report consolidate \
+        upgrade-status prepare-switchover \
         start-bootstrap-mining stop-bootstrap-mining \
         verify-readiness transition-to-pos \
         enable-staking enable-masternodes \
@@ -185,6 +186,14 @@ status:
 
 check-inventory:
 	$(PYTHON) scripts/validate_inventory.py $(INVENTORY)
+
+## Chain height against the staged activation schedule. Read-only.
+upgrade-status:
+	$(PLAYBOOK) ansible/playbooks/ops/upgrade_status.yml
+
+## Generate BLS keys and registration worksheets ahead of block 5000.
+prepare-switchover:
+	$(PLAYBOOK) ansible/playbooks/lifecycle/prepare_v6_switchover.yml
 
 ## Balances and UTXO shape per instance. Read-only.
 wallet-report:

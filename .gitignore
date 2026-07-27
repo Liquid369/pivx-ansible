@@ -46,3 +46,6 @@ Thumbs.db
 
 # Working docs stay local
 REVIEW.md
+
+# Switchover worksheets contain BLS secrets
+switchover/

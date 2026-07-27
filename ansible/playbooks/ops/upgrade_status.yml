@@ -1,0 +1,67 @@
+---
+# playbooks/ops/upgrade_status.yml
+# Where the chain is against the staged activation schedule. Read-only.
+#
+#   make upgrade-status
+#
+# Answers the two questions that matter mid-run: which upgrades are live, and
+# how long until the next one. The v6 row is the important one, legacy
+# masternodes stop counting the moment it activates.
+
+- name: Upgrade status
+  hosts: seeders[0]
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Read chain height
+      ansible.builtin.shell: |
+        set -o pipefail
+        for c in /etc/pivx/*/pivx.conf; do
+          h=$(/usr/local/bin/pivx-cli -conf=$c getblockcount 2>/dev/null) && { echo "$h"; break; }
+        done
+      args:
+        executable: /bin/bash
+      register: height_out
+      changed_when: false
+
+    - name: Split the schedule around the current height
+      ansible.builtin.set_fact:
+        cur_height: "{{ height_out.stdout | trim | int }}"
+        active_upgrades: >-
+          {{ upgrade_schedule | selectattr('height', 'le', height_out.stdout | trim | int)
+             | map(attribute='name') | list }}
+        pending_upgrades: >-
+          {{ upgrade_schedule | rejectattr('height', 'le', height_out.stdout | trim | int) | list }}
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          - "height: {{ cur_height }}"
+          - "active ({{ active_upgrades | length }}/{{ upgrade_schedule | length }}): {{ active_upgrades | join(', ') | default('none', true) }}"
+          - >-
+            next: {{ (pending_upgrades | first).name | default('all activated') }}
+            at {{ (pending_upgrades | first).height | default('-') }}
+            ({{ ((pending_upgrades | first).height | int) - (cur_height | int) }} blocks away,
+            ~{{ ((((pending_upgrades | first).height | int) - (cur_height | int)) / 60) | round(1) }}h)
+        verbosity: 0
+      when: pending_upgrades | length > 0
+
+    - name: Report when everything has activated
+      ansible.builtin.debug:
+        msg: "height {{ cur_height }}: every scheduled upgrade is active"
+      when: pending_upgrades | length == 0
+
+    - name: Masternode mode sanity
+      ansible.builtin.debug:
+        msg: >-
+          {% if (cur_height | int) >= (v6_activation_height | int) and masternode_mode == 'legacy' %}
+          WARNING chain is past v6 ({{ v6_activation_height }}) but masternode_mode is still legacy.
+          Legacy masternodes are obsolete, the fleet has none until ProRegTx are submitted.
+          Set masternode_mode to deterministic and run deploy-pivx.
+          {% elif (cur_height | int) < (v6_activation_height | int) and masternode_mode == 'deterministic' %}
+          WARNING masternode_mode is deterministic but v6 is not active until {{ v6_activation_height }}.
+          Special transactions are rejected before then, registrations will fail.
+          {% else %}
+          masternode_mode={{ masternode_mode }} is correct for height {{ cur_height }}
+          {% endif %}

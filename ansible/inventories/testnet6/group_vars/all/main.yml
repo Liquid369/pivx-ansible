@@ -149,6 +149,25 @@ masternode_enabled: false                 # set true per-instance once MN reg is
 # staged and fired at the cutover, not before.
 masternode_mode: legacy                   # legacy | deterministic
 v6_activation_height: 5000
+
+# Staged activation heights, mirrors CTestNetParams on the 2026_testnet6
+# branch. Kept here so the fleet can report what has activated and what is
+# next. Update both together if chainparams changes.
+upgrade_schedule:
+  - {height: 201, name: POS}
+  - {height: 225, name: POS_V2}
+  - {height: 250, name: ZC}
+  - {height: 275, name: ZC_V2}
+  - {height: 300, name: BIP65}
+  - {height: 350, name: ZC_PUBLIC}
+  - {height: 400, name: V3_4}
+  - {height: 450, name: V4_0}
+  - {height: 500, name: V5_0}
+  - {height: 550, name: V5_2}
+  - {height: 600, name: V5_3}
+  - {height: 650, name: V5_5}
+  - {height: 700, name: V5_6}
+  - {height: 5000, name: V6_0}
 llmq_type: 1                              # LLMQ_50_60
 quorum_size: 50                           # llmq50_60.size (minSize 40 to form)
 
