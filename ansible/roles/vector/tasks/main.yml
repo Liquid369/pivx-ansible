@@ -44,6 +44,24 @@
     mode: "0644"
   notify: restart vector
 
+# The deb package ships /etc/vector/vector.yaml (a demo_logs -> console sample)
+# and, with no config flag set, vector loads THAT instead of our vector.toml,
+# so nothing reaches Loki. Point vector at our config and drop the sample.
+- name: Point Vector at our config
+  ansible.builtin.copy:
+    dest: /etc/default/vector
+    content: "VECTOR_CONFIG=/etc/vector/vector.toml\n"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart vector
+
+- name: Remove packaged demo config
+  ansible.builtin.file:
+    path: /etc/vector/vector.yaml
+    state: absent
+  notify: restart vector
+
 - name: ufw - allow Vector API (from monitoring host only)
   community.general.ufw:
     rule: allow

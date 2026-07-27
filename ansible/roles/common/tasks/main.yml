@@ -113,6 +113,36 @@
     - host_ipv6_2 != (host_ipv6 | default(''))
   notify: netplan apply
 
+# Contabo hands out a /17, so fleet hosts in the same /24 look on-link and the
+# kernel tries direct L2 delivery, which Contabo blocks between VPS (ARP goes
+# INCOMPLETE). This breaks same-subnet traffic like prometheus scraping the EU
+# node_exporters. Route those peers via the gateway instead. Peers in other
+# subnets already route through the gateway and are unaffected.
+# ponytail: matches same /24, our EU hosts are all 169.58.75.x. If a future EU
+# host lands elsewhere in the /17, widen this match.
+- name: Find same-subnet fleet peers (Contabo blocks direct L2)
+  ansible.builtin.set_fact:
+    l2_isolated_peers: "{{ groups['provider_contabo'] | difference([inventory_hostname]) | map('extract', hostvars, 'ansible_host') | select('search', '^' + (ansible_host.split('.')[0:3] | join('.')).replace('.', '[.]') + '[.]') | list }}"
+
+- name: Route same-subnet peers via the gateway
+  ansible.builtin.copy:
+    dest: /etc/netplan/61-pivx-routes.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          {{ ansible_default_ipv4.interface }}:
+            routes:
+      {% for ip in l2_isolated_peers %}
+              - to: {{ ip }}/32
+                via: {{ ansible_default_ipv4.gateway }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0600"
+  when: l2_isolated_peers | length > 0
+  notify: netplan apply
+
 - name: Harden sshd to key-only login
   # 00- prefix: sshd first-match-wins, must sort before cloud-init's 50-*.conf
   ansible.builtin.copy:

@@ -45,7 +45,7 @@ type = "remap"
 inputs = ["pivx_journal"]
 source = '''
   # Strip "pivxd-" prefix from SyslogIdentifier to get bare instance name
-  .instance = replace!(string!(.SYSLOG_IDENTIFIER), "pivxd-", "")
+  .instance = replace(string!(.SYSLOG_IDENTIFIER), "pivxd-", "")
 
   # Static instance metadata map — baked at deploy time from host_vars.
   # Avoids runtime lookups. Re-run deploy-pivx when instances change.

@@ -1,0 +1,1 @@
+panels.append(logs("Fleet Logs (errors/warnings)", '~ "(?i)error|~ "(?i)error|warn|reject|fail"', 0, 42))
