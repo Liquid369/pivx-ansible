@@ -50,7 +50,7 @@ PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $
 .PHONY: help \
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
         status check-inventory show-layout wallet-report consolidate \
-        upgrade-status prepare-switchover create-collateral \
+        upgrade-status prepare-switchover create-collateral verify-onions \
         start-bootstrap-mining stop-bootstrap-mining \
         verify-readiness transition-to-pos \
         enable-staking enable-masternodes \
@@ -202,6 +202,10 @@ create-collateral:
 ## Generate BLS keys and registration worksheets ahead of block 5000.
 prepare-switchover:
 	$(PLAYBOOK) ansible/playbooks/lifecycle/prepare_v6_switchover.yml
+
+## Diff host_vars onion addresses against what Tor generated. Read-only.
+verify-onions:
+	$(PLAYBOOK) ansible/playbooks/ops/verify_onions.yml
 
 ## Balances and UTXO shape per instance. Read-only.
 wallet-report:

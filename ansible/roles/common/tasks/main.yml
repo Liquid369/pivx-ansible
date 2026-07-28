@@ -94,8 +94,12 @@
     reload: true
 
 - name: Configure secondary IPv6 address (netplan drop-in)
-  # Contabo images configure only ::1 from the /64. The v6-mn04 instance
-  # binds ::2, which we persist here and activate via `netplan apply`.
+  # Provider images configure only ::1. The v6-mn04 instance binds ::2, which
+  # we persist here and activate via `netplan apply`.
+  #
+  # Prefix differs by provider: Contabo hands out a /64 and the second address
+  # routes on its own. OVH configures /128 with an off-subnet gateway, so the
+  # second address needs the gateway pinned on-link or it has no route out.
   ansible.builtin.copy:
     dest: /etc/netplan/60-pivx-ipv6.yaml
     content: |
@@ -104,7 +108,15 @@
         ethernets:
           {{ ansible_default_ipv4.interface }}:
             addresses:
-              - "{{ host_ipv6_2 }}/64"
+              - "{{ host_ipv6_2 }}/{{ host_ipv6_prefixlen | default(64) }}"
+      {% if host_ipv6_gateway | default('') != '' %}
+            routes:
+              - to: "{{ host_ipv6_gateway }}"
+                scope: link
+              - to: "::/0"
+                via: "{{ host_ipv6_gateway }}"
+                on-link: true
+      {% endif %}
     owner: root
     group: root
     mode: "0600"

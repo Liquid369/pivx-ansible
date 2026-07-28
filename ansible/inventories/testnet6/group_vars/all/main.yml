@@ -188,11 +188,12 @@ pivx_seed_nodes:
   - "169.58.75.147:51534"    # tn6-cb1-seed01 IPv4 (EU Nuremberg)
   - "62.146.176.174:51534"   # tn6-cb2-seed02 IPv4 (US St. Louis)
   - "209.126.84.12:51534"    # tn6-cb3-seed03 IPv4 (US St. Louis)
-  # Tor bootstrap points (tor-mn05 on cb1/cb2/cb3) so the tor cohort can
-  # mesh natively, non-tor instances just skip onion addnodes.
-  - "27at7bsmh4r6ulamu33huyrrr23vd3ulaosckyaglgrimanp7ngxzaqd.onion:51514"
-  - "ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion:51514"
-  - "u2gjinpoyfehafgl4ibmpkqxkuoz2gfw5zm5spirumjl2pyu5ghwzcad.onion:51514"
+  # Tor bootstrap points (tor-mn05 on cb1/cb2/cb3). Port is the hidden
+  # service's PUBLIC port, which the torrc maps to each instance's local
+  # port. Dialling the local port gets connection refused.
+  - "27at7bsmh4r6ulamu33huyrrr23vd3ulaosckyaglgrimanp7ngxzaqd.onion:51474"
+  - "ahznq5kwpd6xwxfggg2ooy545ts2f72l7flu3rbcyxoog7fjjjd5j7ad.onion:51474"
+  - "u2gjinpoyfehafgl4ibmpkqxkuoz2gfw5zm5spirumjl2pyu5ghwzcad.onion:51474"
 
 # ---------------------------------------------------------------------------
 # Logging labels (common; instances add their own below)

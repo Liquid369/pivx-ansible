@@ -1,24 +1,28 @@
-# host_vars/tn6-cb4.yml
+# host_vars/tn6-ovh3.yml
 #
-# Contabo Cloud VPS 8 (2026), US St. Louis
-# Plan class: contabo_8vcpu
+# OVH, Sydney AU (ap-southeast-syd)
+# Plan class: contabo_6vcpu
 # 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor).
 #
-# NOTE: Contabo provides a single IPv4 per VPS. mn02 shares the IPv4 on a
-# different P2P port (valid for testnet DMNs: uniqueness is on ip:port).
-# The IPv6 /64 provides ::1 (stock) and ::2 (added via netplan drop-in).
+# Single IPv4 per host, so mn02 shares it on a different P2P port
+# (uniqueness is on ip:port). OVH configures IPv6 as /128 with an
+# off-subnet gateway, so ::2 needs the gateway pinned on-link or it has
+# no route out - hence host_ipv6_prefixlen and host_ipv6_gateway below.
+# Unlike Contabo, OVH does not block direct L2 between hosts.
 
-provider: contabo
-provider_plan: contabo_8vcpu
-chaos_group: chaos_contabo
+provider: ovh
+provider_plan: ovh_syd
+chaos_group: chaos_ovh
 node_role: masternode
-host_label: tn6-cb4
+host_label: tn6-ovh3
 pivx_instances_expected: 6
 
-host_ipv4:   "217.77.13.82"
-host_ipv4_2: "217.77.13.82"    # single IPv4 — shared, mn02 uses port 51484
-host_ipv6:   "2605:a140:2346:5862::1"
-host_ipv6_2: "2605:a140:2346:5862::2"   # added by common role netplan drop-in
+host_ipv4:   "139.99.130.199"
+host_ipv4_2: "139.99.130.199"    # single IPv4 — shared, mn02 uses port 51484
+host_ipv6:   "2402:1f00:8100:2c7::1"
+host_ipv6_2: "2402:1f00:8100:2c7::2"
+host_ipv6_prefixlen: 128
+host_ipv6_gateway: "2402:1f00:8100:2ff:ff:ff:ff:ff"
 
 # Firewall: open all PIVX P2P slots used by this host.
 ufw_pivx_ports:
@@ -31,7 +35,7 @@ ufw_pivx_ports:
 
 pivx_instances:
 
-  - name: tn6-cb4-v4-mn01
+  - name: tn6-ovh3-v4-mn01
     enabled: true
     slot: 0
     protocol_class: ipv4
@@ -43,16 +47,16 @@ pivx_instances:
     rpc_port: 51478
     rpc_user: rpc_v4mn01
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v4-mn01"
-    logdir: "/var/log/pivx/tn6-cb4-v4-mn01"
-    confdir: "/etc/pivx/tn6-cb4-v4-mn01"
+    datadir: "/var/lib/pivx/tn6-ovh3-v4-mn01"
+    logdir: "/var/log/pivx/tn6-ovh3-v4-mn01"
+    confdir: "/etc/pivx/tn6-ovh3-v4-mn01"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-v4-mn02
+  - name: tn6-ovh3-v4-mn02
     enabled: true
     slot: 1
     protocol_class: ipv4
@@ -64,16 +68,16 @@ pivx_instances:
     rpc_port: 51488
     rpc_user: rpc_v4mn02
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v4-mn02"
-    logdir: "/var/log/pivx/tn6-cb4-v4-mn02"
-    confdir: "/etc/pivx/tn6-cb4-v4-mn02"
+    datadir: "/var/lib/pivx/tn6-ovh3-v4-mn02"
+    logdir: "/var/log/pivx/tn6-ovh3-v4-mn02"
+    confdir: "/etc/pivx/tn6-ovh3-v4-mn02"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-v6-mn03
+  - name: tn6-ovh3-v6-mn03
     enabled: true
     slot: 2
     protocol_class: ipv6
@@ -85,16 +89,16 @@ pivx_instances:
     rpc_port: 51498
     rpc_user: rpc_v6mn03
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v6-mn03"
-    logdir: "/var/log/pivx/tn6-cb4-v6-mn03"
-    confdir: "/etc/pivx/tn6-cb4-v6-mn03"
+    datadir: "/var/lib/pivx/tn6-ovh3-v6-mn03"
+    logdir: "/var/log/pivx/tn6-ovh3-v6-mn03"
+    confdir: "/etc/pivx/tn6-ovh3-v6-mn03"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-v6-mn04
+  - name: tn6-ovh3-v6-mn04
     enabled: true
     slot: 3
     protocol_class: ipv6
@@ -106,16 +110,16 @@ pivx_instances:
     rpc_port: 51508
     rpc_user: rpc_v6mn04
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-v6-mn04"
-    logdir: "/var/log/pivx/tn6-cb4-v6-mn04"
-    confdir: "/etc/pivx/tn6-cb4-v6-mn04"
+    datadir: "/var/lib/pivx/tn6-ovh3-v6-mn04"
+    logdir: "/var/log/pivx/tn6-ovh3-v6-mn04"
+    confdir: "/etc/pivx/tn6-ovh3-v6-mn04"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-tor-mn05
+  - name: tn6-ovh3-tor-mn05
     enabled: true
     slot: 4
     protocol_class: tor
@@ -123,22 +127,22 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: "bjseyn7rmquqgpdko5jtwfqksinxlxrbw5xayhphiubewbmwjcaqetid.onion"
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb4-tor-mn05"
+    onion_address: "exn64wpbtjwue6rkhcdsqph7ti54u737r3zk36nqb6fb5sii2wi3xkad.onion"
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-ovh3-tor-mn05"
     p2p_port: 51514
     rpc_port: 51518
     rpc_user: rpc_tormn05
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-tor-mn05"
-    logdir: "/var/log/pivx/tn6-cb4-tor-mn05"
-    confdir: "/etc/pivx/tn6-cb4-tor-mn05"
+    datadir: "/var/lib/pivx/tn6-ovh3-tor-mn05"
+    logdir: "/var/log/pivx/tn6-ovh3-tor-mn05"
+    confdir: "/etc/pivx/tn6-ovh3-tor-mn05"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
-  - name: tn6-cb4-tor-mn06
+  - name: tn6-ovh3-tor-mn06
     enabled: true
     slot: 5
     protocol_class: tor
@@ -146,15 +150,15 @@ pivx_instances:
     role: masternode
     bind_addr: "127.0.0.1"
     external_ip: ""
-    onion_address: "xr6uryy2qhs43k5puoeklaxywdsyifplqnecq3y2za33ehw3dxnn7mqd.onion"
-    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb4-tor-mn06"
+    onion_address: "j7pki7wr7xwc5fkdrg2ck2qrqgoz23cspjrk4dg4y3hqb2igh3xmgtid.onion"
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-ovh3-tor-mn06"
     p2p_port: 51524
     rpc_port: 51528
     rpc_user: rpc_tormn06
     rpc_password: "{{ vault_pivx_rpc_password }}"
-    datadir: "/var/lib/pivx/tn6-cb4-tor-mn06"
-    logdir: "/var/log/pivx/tn6-cb4-tor-mn06"
-    confdir: "/etc/pivx/tn6-cb4-tor-mn06"
+    datadir: "/var/lib/pivx/tn6-ovh3-tor-mn06"
+    logdir: "/var/log/pivx/tn6-ovh3-tor-mn06"
+    confdir: "/etc/pivx/tn6-ovh3-tor-mn06"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration

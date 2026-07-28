@@ -51,7 +51,13 @@ bind=127.0.0.1
 proxy=127.0.0.1:{{ tor_socks_port | default(9050) }}
 onlynet=onion
 {% if instance.onion_address | default('') != '' %}
-externalip={{ instance.onion_address }}
+# Advertise the hidden service's PUBLIC port, not the local one below. The
+# torrc maps {{ pivx_p2p_port_base }} -> this instance's local port, so peers
+# must dial {{ pivx_p2p_port_base }}. Advertising the local port instead gets
+# every dial refused, and pivxd retries hard enough to burn a whole core.
+# Masternodes must announce {{ pivx_p2p_port_base }} anyway (masternode.cpp
+# CheckDefaultPort), so this is the same value either way.
+externalip={{ instance.onion_address }}:{{ pivx_p2p_port_base }}
 {% else %}
 # externalip= not set — run `make deploy-tor` first and fill onion_address in host_vars
 {% endif %}
@@ -61,11 +67,14 @@ port={{ instance.p2p_port }}
 
 # =============================================================================
 # SEED / ADDNODE
-# Connections to the known seed nodes.
-# Replace with real addresses once seeds are up.
+# Only tor instances get the onion seeds. A clearnet instance has no SOCKS
+# proxy, so dialling an onion fails with "Cannot create socket: unsupported
+# network" on every retry and burns an outbound slot for nothing.
 # =============================================================================
 {% for seed in pivx_seed_nodes | default([]) %}
+{% if '.onion' not in seed or instance.protocol_class == 'tor' %}
 addnode={{ seed }}
+{% endif %}
 {% endfor %}
 
 # =============================================================================
