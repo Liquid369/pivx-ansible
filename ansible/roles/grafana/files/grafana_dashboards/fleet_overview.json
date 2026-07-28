@@ -89,11 +89,11 @@
               },
               {
                 "color": "yellow",
-                "value": 8
+                "value": 2
               },
               {
                 "color": "green",
-                "value": 9
+                "value": 3
               }
             ]
           }
@@ -693,7 +693,7 @@
       },
       "targets": [
         {
-          "expr": "rate(node_network_receive_bytes_total{device=\"eth0\"}[5m])",
+          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|tun.*|tap.*\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "A",
           "datasource": {
@@ -702,7 +702,7 @@
           }
         },
         {
-          "expr": "rate(node_network_transmit_bytes_total{device=\"eth0\"}[5m])",
+          "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|tun.*|tap.*\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "B",
           "datasource": {
@@ -893,7 +893,7 @@
       },
       "targets": [
         {
-          "expr": "{provider=\"contabo\"} |~ \"(?i)error|warn|reject|fail\"",
+          "expr": "{provider=~\"contabo|ovh\"} |~ \"(?i)error|warn|reject|fail\"",
           "refId": "A",
           "datasource": {
             "type": "loki",
