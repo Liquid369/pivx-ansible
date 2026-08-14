@@ -1,0 +1,14 @@
+[Unit]
+Description=PIVX chain metrics for the node_exporter textfile collector
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pivx_metrics.py
+# Runs as root: pivx.conf is 0640 root:pivx and holds the RPC credentials.
+User=root
+# A pass that outlives its own interval means something is badly wrong; kill it
+# rather than let passes pile up.
+TimeoutStartSec={{ pivx_metrics_interval }}
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,24 @@
+---
+# roles/pivx_metrics/defaults/main.yml
+# Chain-state metrics for Grafana, exported through node_exporter's textfile
+# collector rather than a separate scrape target.
+
+# Must match node_exporter's --collector.textfile.directory.
+pivx_metrics_textfile_dir: /var/lib/node_exporter/textfile
+
+# How often to poll. Each instance costs ~7 pivx-cli calls, so a host with 10
+# instances makes ~70 calls per pass; 60s keeps that comfortably idle.
+pivx_metrics_interval: 60
+
+# Per-RPC timeout. generatetoaddress can hold an RPC worker for minutes during
+# bootstrap mining, so this must fail fast rather than stall the whole pass.
+pivx_metrics_rpc_timeout: 15
+
+# Blocks below the tip for the fork-detection fingerprint. Nodes differ at the
+# tip during normal propagation; this far back they should agree exactly.
+pivx_metrics_checkpoint_depth: 10
+
+# Checkpoint heights are snapped to a multiple of this. Without it each node
+# fingerprints its own tip minus depth, so nodes a block apart compare
+# different blocks and register as a fork.
+pivx_metrics_checkpoint_stride: 10

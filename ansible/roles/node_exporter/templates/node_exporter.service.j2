@@ -11,7 +11,8 @@ Group=node_exporter
 ExecStart=/usr/local/bin/node_exporter \
   --web.listen-address=:{{ node_exporter_port }} \
   --collector.systemd \
-  --collector.processes
+  --collector.processes \
+  --collector.textfile.directory={{ pivx_metrics_textfile_dir | default('/var/lib/node_exporter/textfile') }}
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true

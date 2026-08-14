@@ -104,21 +104,36 @@ groups:
     interval: 60s
     rules:
 
-      # PLACEHOLDER: requires pivxd_exporter (see docs/OBSERVABILITY.md)
+
+      # Chain state comes from the pivx_metrics textfile collector, served by
+      # node_exporter — there is no separate pivxd_exporter scrape job, so
+      # per-instance liveness is the pivxd_up metric rather than `up`.
       - alert: PivxdInstanceDown
-        expr: up{job="pivxd_exporter"} == 0
+        expr: pivxd_up == 0
         for: 3m
         labels:
           severity: critical
         annotations:
-          summary: "PIVX instance {{ '{{' }} $labels.instance {{ '}}' }} is down"
+          summary: "PIVX instance {{ '{{' }} $labels.pivx_instance {{ '}}' }} is down"
           description: >
-            pivxd instance {{ '{{' }} $labels.instance {{ '}}' }}
-            (cohort={{ '{{' }} $labels.cohort {{ '}}' }},
-             protocol={{ '{{' }} $labels.protocol_class {{ '}}' }})
-            has been unreachable for >3 minutes.
+            pivxd instance {{ '{{' }} $labels.pivx_instance {{ '}}' }} on
+            {{ '{{' }} $labels.host {{ '}}' }}
+            (cohort={{ '{{' }} $labels.cohort {{ '}}' }})
+            has not answered getblockchaininfo for >3 minutes.
 
-      # PLACEHOLDER: chain height metric from custom exporter
+      - alert: PivxMetricsStale
+        # Without this, a dead collector looks identical to a healthy fleet:
+        # the textfile keeps serving its last values forever.
+        expr: time() - pivxd_scrape_timestamp > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Chain metrics stale on {{ '{{' }} $labels.host {{ '}}' }}"
+          description: >
+            pivx-metrics.timer has not written for >5 minutes, so every chain
+            panel for this host is showing stale data.
+
       - alert: ChainHeightDiverged
         expr: |
           max(pivxd_block_height) - min(pivxd_block_height) > 10
@@ -128,23 +143,82 @@ groups:
         annotations:
           summary: "Chain height divergence across fleet"
           description: >
-            There is >10 block difference between the highest and lowest block
-            heights in the fleet. Possible stalled instance or network partition.
+            >10 blocks between the highest and lowest instance in the fleet.
+            Stalled instance, or a network partition.
 
-      # PLACEHOLDER: peer count from custom exporter
+      - alert: ChainForkDetected
+        # Grouped by checkpoint_height so only nodes fingerprinting the SAME
+        # block are compared. Without the grouping this fires constantly:
+        # nodes a block or two apart during propagation hash different blocks
+        # and every propagation looks like a fork.
+        expr: max(count by (checkpoint_height) (count_values("fp", pivxd_checkpoint_fingerprint))) > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FORK: fleet disagrees on chain history"
+          description: >
+            Instances report different block hashes below the tip. The fleet is
+            split across chains — compare pivxd_checkpoint_fingerprint by
+            instance to find which side each node is on.
+
       - alert: PeerCountTooLow
         expr: pivxd_peer_count < {{ min_peer_count | default(2) }}
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Low peer count on {{ '{{' }} $labels.instance {{ '}}' }}"
+          summary: "Low peer count on {{ '{{' }} $labels.pivx_instance {{ '}}' }}"
           description: >
-            Instance {{ '{{' }} $labels.instance {{ '}}' }} has fewer than
-            {{ min_peer_count | default(2) }} peers.
+            {{ '{{' }} $labels.pivx_instance {{ '}}' }} has
+            {{ '{{' }} $value {{ '}}' }} peers, below
+            {{ min_peer_count | default(2) }}.
+
+      - alert: PivxInstanceNoInbound
+        # A masternode nobody can dial still looks healthy on every other
+        # metric — that is what silently broke the Tor cohort. Scoped to
+        # MN-capable instances only: v4-mn02 and the observer legitimately have
+        # no inbound and would otherwise fire forever.
+        #
+        # Note some zero-inbound is structural, not a fault. Only one outbound
+        # per netgroup is permitted (net.cpp:1807), and this fleet has ~14
+        # netgroups for 115 masternodes, so instances that lose their group's
+        # slot get none. 30m is deliberately long to ride that out.
+        expr: pivxd_peers_inbound == 0 and on(pivx_instance) pivxd_up{mn_capable="1"} == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No inbound peers on {{ '{{' }} $labels.pivx_instance {{ '}}' }}"
+          description: >
+            {{ '{{' }} $labels.pivx_instance {{ '}}' }} has outbound peers but
+            zero inbound for 30m — its advertised address is probably
+            unreachable, which disqualifies it as a masternode.
+
+      - alert: PivxStuckInIBD
+        expr: pivxd_ibd == 1
+        for: 60m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ '{{' }} $labels.pivx_instance {{ '}}' }} stuck in initial block download"
+          description: >
+            IBD suppresses address gossip, so an instance parked here stops
+            advertising itself and its addrman goes stale.
+
+      - alert: PivxBansClimbing
+        expr: pivxd_banned_peers > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ '{{' }} $labels.pivx_instance {{ '}}' }} is banning peers"
+          description: >
+            {{ '{{' }} $value {{ '}}' }} bans. Fleet nodes banning each other
+            usually means a misbehaviour loop, not hostile peers.
 
       - alert: AllTorInstancesDown
-        expr: count(up{job="pivxd_exporter", cohort="tor"} == 0) == count(up{job="pivxd_exporter", cohort="tor"})
+        expr: count(pivxd_up{cohort="tor"} == 0) == count(pivxd_up{cohort="tor"})
         for: 2m
         labels:
           severity: critical
@@ -154,7 +228,7 @@ groups:
           description: "The entire Tor cohort has gone offline. Quorum will degrade."
 
       - alert: AllIPv6InstancesDown
-        expr: count(up{job="pivxd_exporter", cohort="ipv6"} == 0) == count(up{job="pivxd_exporter", cohort="ipv6"})
+        expr: count(pivxd_up{cohort="ipv6"} == 0) == count(pivxd_up{cohort="ipv6"})
         for: 2m
         labels:
           severity: critical
@@ -163,10 +237,54 @@ groups:
           summary: "ALL IPv6 masternode instances are down"
           description: "The entire IPv6 cohort has gone offline. Quorum will degrade."
 
+      - alert: CohortBelowQuorumMinSize
+        # llmq_50_60 needs minSize members to run a DKG at all. Below this a
+        # cohort-isolated quorum cannot form, which is the whole point of the
+        # cohort sizing work.
+        expr: count by (cohort) (pivxd_up == 1) < {{ llmq_min_size | default(40) }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cohort {{ '{{' }} $labels.cohort {{ '}}' }} below LLMQ minSize"
+          description: >
+            {{ '{{' }} $value {{ '}}' }} live instances in
+            {{ '{{' }} $labels.cohort {{ '}}' }}, under the
+            {{ llmq_min_size | default(40) }} a DKG needs.
+
+      - alert: SupplyDisagreement
+        # Nodes at the same supply-index height must report identical supply.
+        # Disagreement there is a consensus bug, not a reporting lag — which is
+        # why the index-height stddev has to be zero for this to fire.
+        expr: stddev(pivxd_supply_total) > 0 and stddev(pivxd_supply_updateheight) == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FLEET DISAGREES ON MONEY SUPPLY"
+          description: >
+            Instances at the same supply index height report different total
+            supply. Compare pivxd_supply_total by instance.
+
+      - alert: UnexpectedIssuance
+        # Emission is deterministic through the PoW window. Supply moving while
+        # nothing is mining means coin appeared from somewhere it should not.
+        expr: |
+          rate(pivxd_supply_total[30m]) > 0
+          and on() (max(pivxd_block_height) - min(pivxd_block_height offset 30m)) == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Supply grew without the chain advancing"
+          description: >
+            pivxd_supply_total increased over 30m while chain height did not
+            move. Investigate before mining further.
+
       - alert: ProviderMajorityDown
         expr: |
-          count(up{job="pivxd_exporter"} == 0) by (provider)
-          / count(up{job="pivxd_exporter"}) by (provider) > 0.5
+          count(pivxd_up == 0) by (provider)
+          / count(pivxd_up) by (provider) > 0.5
         for: 2m
         labels:
           severity: critical
@@ -176,9 +294,6 @@ groups:
             More than 50% of {{ '{{' }} $labels.provider {{ '}}' }} PIVX
             instances are unreachable. Potential provider-level outage.
 
-  # ===========================================================================
-  # BOOTSTRAP MINING PHASE (Phase 2)
-  # ===========================================================================
   - name: bootstrap_mining
     interval: 60s
     rules:

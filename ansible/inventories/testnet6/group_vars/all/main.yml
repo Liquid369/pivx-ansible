@@ -115,15 +115,18 @@ tor_socks_port: 9050
 # PoS consensus and then masternode activation prerequisites are met.
 # ---------------------------------------------------------------------------
 bootstrap_mining_enabled: false           # set true on miner hosts during Phase 2
-bootstrap_mining_threads: 1               # CPU threads for testnet mining; low value is fine
-# NOTE: there is no miningaddress conf option in this build — PoW rewards are
-# paid to the mining node's own wallet (GenerateBitcoins mines to vpwallets[0]).
-# Sweep rewards from the seeder wallets after the PoW phase if needed.
+# NOTE: there is no miningaddress conf option in this build. The miner role calls
+# getnewaddress on the mining instance and passes it to generatetoaddress, so
+# rewards land in that instance's own wallet. Sweep rewards from the seeder
+# wallet after the PoW phase if needed.
+# There is no thread setting: generatetoaddress takes nblocks and an address and
+# nothing else, so a thread count would control nothing.
 
 # Target block height before Phase 3 staking transition begins.
 # CONFIRMED against chainparams.cpp (testnet):
 #   consensus.vUpgrades[UPGRADE_POS].nActivationHeight = 201
-# setgenerate refuses to mine once UPGRADE_POS is active.
+# PoW is mined only up to this height - 1. Block 201 itself has to be staked,
+# so the miner role stops one short on purpose.
 mining_phase_target_height: 201
 
 # ---------------------------------------------------------------------------

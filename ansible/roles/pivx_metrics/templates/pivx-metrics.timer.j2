@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect PIVX chain metrics every {{ pivx_metrics_interval }}s
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec={{ pivx_metrics_interval }}
+# Spread the fleet out so 15 hosts do not all hammer their RPC at once.
+RandomizedDelaySec=10
+AccuracySec=5
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,52 @@
+---
+# roles/pivx_metrics/tasks/main.yml
+
+- name: Create the textfile collector directory
+  ansible.builtin.file:
+    path: "{{ pivx_metrics_textfile_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the metrics collector
+  ansible.builtin.template:
+    src: pivx_metrics.py.j2
+    dest: /usr/local/bin/pivx_metrics.py
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the collector service
+  ansible.builtin.template:
+    src: pivx-metrics.service.j2
+    dest: /etc/systemd/system/pivx-metrics.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd for pivx-metrics
+
+- name: Install the collector timer
+  ansible.builtin.template:
+    src: pivx-metrics.timer.j2
+    dest: /etc/systemd/system/pivx-metrics.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd for pivx-metrics
+
+- name: Flush handlers so the unit files are loaded before enabling
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the collector timer
+  ansible.builtin.systemd:
+    name: pivx-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Run once now so Grafana has data immediately
+  ansible.builtin.systemd:
+    name: pivx-metrics.service
+    state: started
+  changed_when: true

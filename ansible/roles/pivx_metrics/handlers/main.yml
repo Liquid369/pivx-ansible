@@ -1,0 +1,4 @@
+---
+- name: reload systemd for pivx-metrics
+  ansible.builtin.systemd:
+    daemon_reload: true
