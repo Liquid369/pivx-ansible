@@ -1,0 +1,126 @@
+---
+# roles/grafana_proxy/tasks/main.yml
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Fetch Cloudflare IPv4 ranges
+  ansible.builtin.uri:
+    url: "{{ cloudflare_ipv4_url }}"
+    return_content: true
+  register: cf_v4
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fetch Cloudflare IPv6 ranges
+  ansible.builtin.uri:
+    url: "{{ cloudflare_ipv6_url }}"
+    return_content: true
+  register: cf_v6
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Assemble the Cloudflare CIDR list
+  ansible.builtin.set_fact:
+    cloudflare_cidrs: >-
+      {{ (cf_v4.content.split() + cf_v6.content.split()) | select('search', '/') | list }}
+
+- name: Refuse to continue if the range fetch looks wrong
+  # A truncated list would lock every user out with a 403, which looks exactly
+  # like a DNS or certificate problem and wastes an afternoon.
+  ansible.builtin.assert:
+    that: cloudflare_cidrs | length >= 20
+    msg: "Only {{ cloudflare_cidrs | length }} Cloudflare ranges fetched — refusing to write a partial allowlist."
+
+- name: Create the certificate directory
+  ansible.builtin.file:
+    path: "{{ grafana_proxy_cert | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Generate a self-signed origin certificate
+  # Only Cloudflare ever validates this, and with SSL mode "Full" it is not
+  # validated at all — it exists so the hop from Cloudflare to us is encrypted
+  # rather than plaintext, which is what mode "Flexible" would leave it as.
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -x509
+      - -nodes
+      - -newkey
+      - rsa:2048
+      - -days
+      - "{{ grafana_proxy_cert_days }}"
+      - -keyout
+      - "{{ grafana_proxy_key }}"
+      - -out
+      - "{{ grafana_proxy_cert }}"
+      - -subj
+      - "/CN={{ grafana_public_hostname }}"
+    creates: "{{ grafana_proxy_cert }}"
+  notify: restart nginx
+
+- name: Lock down the private key
+  ansible.builtin.file:
+    path: "{{ grafana_proxy_key }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Remove the default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Install the Grafana vhost
+  ansible.builtin.template:
+    src: grafana-nginx.conf.j2
+    dest: /etc/nginx/sites-available/grafana.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nginx
+
+- name: Enable the Grafana vhost
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/grafana.conf
+    dest: /etc/nginx/sites-enabled/grafana.conf
+    state: link
+  notify: restart nginx
+
+- name: Validate the nginx config before it is applied
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Enable and start nginx
+  ansible.builtin.service:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: ufw - allow HTTPS from Cloudflare only
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_proxy_port }}"
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ cloudflare_cidrs }}"
+
+- name: ufw - drop the internet-wide Grafana rule
+  # Grafana was reachable on 3000 from anywhere. It now listens on loopback
+  # only, so this rule is both useless and misleading.
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_port }}"
+    proto: tcp
+    delete: true
+  failed_when: false

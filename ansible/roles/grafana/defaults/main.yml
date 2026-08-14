@@ -24,3 +24,8 @@ grafana_datasources_path: /etc/grafana/provisioning/datasources
 # Optional: restrict UFW access to Grafana to these source CIDRs.
 # Empty list = allow from anywhere (testnet default — set your admin IPs!).
 grafana_allowed_cidrs: []
+
+# Set true when nginx fronts Grafana (roles/grafana_proxy). Binds Grafana to
+# loopback and points root_url at the public hostname.
+grafana_behind_proxy: false
+grafana_public_hostname: "grafana.liquid369.wtf"

@@ -1,0 +1,55 @@
+# Managed by Ansible — reverse proxy fronting Grafana for Cloudflare.
+
+# Cloudflare hands us the real client IP in CF-Connecting-IP; without these
+# set_real_ip_from entries every request would be logged as a Cloudflare edge
+# address and Grafana's rate limiting would see one giant client.
+{% for cidr in cloudflare_cidrs %}
+set_real_ip_from {{ cidr }};
+{% endfor %}
+real_ip_header CF-Connecting-IP;
+
+server {
+    listen {{ grafana_proxy_port }} ssl;
+    listen [::]:{{ grafana_proxy_port }} ssl;
+    # No http2 directive: it is nginx >= 1.25 syntax and Ubuntu 24.04 ships
+    # 1.24. HTTP/2 on the origin hop gains nothing anyway — Cloudflare
+    # negotiates HTTP/2 or 3 with the browser independently of this leg.
+    server_name {{ grafana_public_hostname }};
+
+    ssl_certificate     {{ grafana_proxy_cert }};
+    ssl_certificate_key {{ grafana_proxy_key }};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    # Cloudflare already sends HSTS to browsers; this is belt and braces for
+    # anything reaching the origin directly.
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+
+    location / {
+        proxy_pass http://127.0.0.1:{{ grafana_port }};
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        # Grafana Live uses websockets; without the upgrade headers the UI
+        # still loads but live panels silently stop refreshing.
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $http_connection;
+
+        proxy_read_timeout 300s;
+    }
+}
+
+# Anything arriving on the origin that is not for this hostname gets nothing.
+# Without a default server, a direct-to-IP request would be served this vhost.
+server {
+    listen {{ grafana_proxy_port }} ssl default_server;
+    listen [::]:{{ grafana_proxy_port }} ssl default_server;
+    server_name _;
+    ssl_certificate     {{ grafana_proxy_cert }};
+    ssl_certificate_key {{ grafana_proxy_key }};
+    return 444;
+}

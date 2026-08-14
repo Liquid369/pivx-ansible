@@ -13,6 +13,10 @@
   roles:
     - node_exporter
     - process_exporter
+    # Chain state (height, tip fingerprint, peers, mempool, masternode counts)
+    # written to node_exporter's textfile dir. Ordered after node_exporter so
+    # the collector directory exists before the timer first fires.
+    - pivx_metrics
     - vector
 
 - name: Deploy Prometheus, Loki, Grafana, Alertmanager on monitoring host
@@ -24,4 +28,9 @@
     - prometheus
     - loki
     - grafana
+    # nginx on 443 fronting Grafana for Cloudflare. Ordered after grafana so
+    # the backend exists before the proxy starts pointing at it. Cloudflare
+    # cannot proxy port 3000, so this is required, not optional.
+    - role: grafana_proxy
+      when: grafana_behind_proxy | default(false)
     - alertmanager

@@ -1,0 +1,23 @@
+---
+# roles/grafana_proxy/defaults/main.yml
+# Public HTTPS entry point for Grafana, fronted by Cloudflare.
+#
+# Cloudflare's proxy only forwards HTTPS on 443, 2053, 2083, 2087, 2096 and
+# 8443 — never 3000 — so a reverse proxy on the origin is required, not just a
+# DNS record.
+
+grafana_public_hostname: "grafana.liquid369.wtf"
+grafana_proxy_port: 443
+
+# Cloudflare terminates TLS with the browser and opens a second TLS session to
+# us. This cert only ever has to satisfy Cloudflare, so a long-lived self-signed
+# one is fine with SSL mode "Full". Swap in a Cloudflare Origin Certificate and
+# move to "Full (strict)" for origin authentication.
+grafana_proxy_cert: /etc/ssl/grafana/origin.crt
+grafana_proxy_key: /etc/ssl/grafana/origin.key
+grafana_proxy_cert_days: 3650
+
+# Only Cloudflare may reach the origin. Fetched at deploy time rather than
+# pinned, because Cloudflare adds ranges and a stale list silently 403s users.
+cloudflare_ipv4_url: "https://www.cloudflare.com/ips-v4"
+cloudflare_ipv6_url: "https://www.cloudflare.com/ips-v6"

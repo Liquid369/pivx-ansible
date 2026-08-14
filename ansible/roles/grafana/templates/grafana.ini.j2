@@ -2,12 +2,30 @@
 
 [server]
 http_port = {{ grafana_port }}
+{% if grafana_behind_proxy | default(false) %}
+# Bound to loopback: nginx terminates TLS on 443 and proxies here. Before this,
+# Grafana listened on *:3000 with a ufw ALLOW Anywhere rule — open to the
+# internet with only the admin password in front of it.
+http_addr = 127.0.0.1
+domain    = {{ grafana_public_hostname }}
+root_url  = https://{{ grafana_public_hostname }}/
+# Grafana builds redirects and asset URLs from the forwarded headers; without
+# this it emits http:// links behind the proxy and login bounces.
+enforce_domain = false
+{% else %}
 domain    = {{ hostvars[inventory_hostname]['host_ipv4'] | default('localhost') }}
+{% endif %}
 
 [security]
 admin_user     = {{ grafana_admin_user }}
 admin_password = {{ grafana_admin_password }}
 disable_gravatar = true
+{% if grafana_behind_proxy | default(false) %}
+# Cloudflare is the only path in, but these cost nothing and matter if the
+# origin is ever reached directly.
+cookie_secure = true
+cookie_samesite = lax
+{% endif %}
 
 [analytics]
 reporting_enabled = false
