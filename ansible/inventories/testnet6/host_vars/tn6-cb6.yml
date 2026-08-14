@@ -13,7 +13,7 @@ provider_plan: contabo_6vcpu
 chaos_group: chaos_contabo
 node_role: masternode
 host_label: tn6-cb6
-pivx_instances_expected: 6
+pivx_instances_expected: 7
 
 host_ipv4:   "169.58.75.144"
 host_ipv4_2: "169.58.75.144"    # single IPv4 — shared, mn02 uses port 51484
@@ -81,7 +81,7 @@ pivx_instances:
     role: masternode
     bind_addr: "[{{ host_ipv6 }}]"
     external_ip: "{{ host_ipv6 }}"
-    p2p_port: 51494
+    p2p_port: 51474
     rpc_port: 51498
     rpc_user: rpc_v6mn03
     rpc_password: "{{ vault_pivx_rpc_password }}"
@@ -102,7 +102,7 @@ pivx_instances:
     role: masternode
     bind_addr: "[{{ host_ipv6_2 }}]"
     external_ip: "{{ host_ipv6_2 }}"
-    p2p_port: 51504
+    p2p_port: 51474
     rpc_port: 51508
     rpc_user: rpc_v6mn04
     rpc_password: "{{ vault_pivx_rpc_password }}"
@@ -155,6 +155,29 @@ pivx_instances:
     datadir: "/var/lib/pivx/tn6-cb6-tor-mn06"
     logdir: "/var/log/pivx/tn6-cb6-tor-mn06"
     confdir: "/etc/pivx/tn6-cb6-tor-mn06"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-cb6-tor-mn11
+    enabled: true
+    slot: 11
+    protocol_class: tor
+    cohort: tor
+    role: masternode
+    bind_addr: "127.0.0.1"
+    external_ip: ""
+    onion_address: "vx5ljrvn33qef5j62dywal5vgplru6oj4lovyk3irz7r52xfwhfl3syd.onion"
+    onion_service_dir: "/var/lib/tor/pivx_hs/tn6-cb6-tor-mn11"
+    p2p_port: 51584
+    rpc_port: 51588
+    rpc_user: rpc_tormn11
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-cb6-tor-mn11"
+    logdir: "/var/log/pivx/tn6-cb6-tor-mn11"
+    confdir: "/etc/pivx/tn6-cb6-tor-mn11"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration

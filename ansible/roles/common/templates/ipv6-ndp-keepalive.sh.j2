@@ -1,0 +1,38 @@
+#!/bin/bash
+# Keep the upstream router's NDP cache warm for every global IPv6 on this host.
+#
+# WHY
+# Contabo's gateway drops the neighbour entry for an IPv6 address that has not
+# recently announced itself. A pivxd instance that only LISTENS on its address
+# then becomes undialable: outbound still works, inbound silently stops, and
+# every other metric stays green. Measured on this fleet — 49 of 50 IPv6
+# instances had zero inbound peers, and unreachable addresses came back the
+# instant they announced themselves.
+#
+# HOW
+# A neighbour solicitation to the gateway carries our source address and link
+# layer address, so the router (re)learns the mapping. This is done rather than
+# pinging because on some hosts the address cannot source routed traffic at all
+# until the router knows it — cb5 and cb8 both failed every ping from ::1 while
+# ::2 worked, and both recovered immediately after one solicitation. Ping is
+# kept only as a fallback for hosts without ndisc6.
+#
+# Cheap: one small packet per address per run, on-link only.
+TARGET_FALLBACK="{{ ipv6_keepalive_target | default('2606:4700:4700::1111') }}"
+
+IFACE="$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}')"
+GW="$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1); exit}')"
+[ -z "$IFACE" ] && exit 0
+
+ip -6 addr show dev "$IFACE" scope global 2>/dev/null \
+  | awk '/inet6/ {split($2,a,"/"); print a[1]}' \
+  | while read -r src; do
+      if [ -n "$GW" ] && command -v ndisc6 >/dev/null 2>&1; then
+        # -1: single solicitation, do not retry; we do not care about the reply,
+        # only that the router saw our source address.
+        ndisc6 -s "$src" -1 -w 500 "$GW" "$IFACE" >/dev/null 2>&1 || true
+      else
+        ping6 -c1 -W2 -I "$src" "$TARGET_FALLBACK" >/dev/null 2>&1 || true
+      fi
+    done
+exit 0

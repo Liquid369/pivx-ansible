@@ -28,6 +28,9 @@
       - python3-pip
       - jq
       - bc
+      # ndisc6: sends the neighbour solicitations that keep our IPv6 addresses
+      # in the upstream router's NDP cache. See ipv6-ndp-keepalive.sh.
+      - ndisc6
     state: present
 
 - name: Configure chrony (NTP)
@@ -93,13 +96,26 @@
     state: present
     reload: true
 
-- name: Configure secondary IPv6 address (netplan drop-in)
-  # Provider images configure only ::1. The v6-mn04 instance binds ::2, which
-  # we persist here and activate via `netplan apply`.
+- name: Build the list of extra IPv6 addresses to configure
+  # Provider images configure only ::1. Everything past that is ours to add.
   #
+  # How many are usable is provider-specific and was measured, not assumed:
+  #   OVH     routes the whole /64 — verified inbound on ::2/::3/::4/::9 across
+  #           ovh1..ovh5, so the IPv6 cohort scales here for free.
+  #   Contabo routes ::1 and ::2 ONLY. ::3 and beyond return an ICMP
+  #           unreachable from the network (not a firewall drop), so extra
+  #           addresses there are dead no matter what we configure locally.
+  # Test inbound on a ufw-open port when re-checking this: dialling a blocked
+  # port looks identical to an unrouted address and will mislead you.
+  ansible.builtin.set_fact:
+    pivx_ipv6_extra: >-
+      {{ ([host_ipv6_2] if (host_ipv6_2 is defined and host_ipv6_2 != (host_ipv6 | default('')))
+          else []) + (host_ipv6_extra | default([])) }}
+
+- name: Configure extra IPv6 addresses (netplan drop-in)
   # Prefix differs by provider: Contabo hands out a /64 and the second address
-  # routes on its own. OVH configures /128 with an off-subnet gateway, so the
-  # second address needs the gateway pinned on-link or it has no route out.
+  # routes on its own. OVH configures /128 with an off-subnet gateway, so each
+  # extra address needs the gateway pinned on-link or it has no route out.
   ansible.builtin.copy:
     dest: /etc/netplan/60-pivx-ipv6.yaml
     content: |
@@ -108,7 +124,9 @@
         ethernets:
           {{ ansible_default_ipv4.interface }}:
             addresses:
-              - "{{ host_ipv6_2 }}/{{ host_ipv6_prefixlen | default(64) }}"
+      {% for a in pivx_ipv6_extra %}
+              - "{{ a }}/{{ host_ipv6_prefixlen | default(64) }}"
+      {% endfor %}
       {% if host_ipv6_gateway | default('') != '' %}
             routes:
               - to: "{{ host_ipv6_gateway }}"
@@ -120,10 +138,90 @@
     owner: root
     group: root
     mode: "0600"
-  when:
-    - host_ipv6_2 is defined
-    - host_ipv6_2 != (host_ipv6 | default(''))
+  when: pivx_ipv6_extra | length > 0
   notify: netplan apply
+
+- name: Remove the drop-in when the host has no extra IPv6 addresses
+  # Without this the task above only ever adds, so a host that drops back to a
+  # single address keeps a stale drop-in and stops matching the inventory.
+  # Safe to delete: the provider's own 50-cloud-init.yaml carries ::1 and the
+  # IPv6 default route, so only the extra addresses go away.
+  ansible.builtin.file:
+    path: /etc/netplan/60-pivx-ipv6.yaml
+    state: absent
+  when: pivx_ipv6_extra | length == 0
+  notify: netplan apply
+
+# Additional IPv4 addresses (OVH failover IPs, Contabo extra IPs).
+#
+# These are routed to the server at the provider edge and are NOT announced to
+# the OS in any way — no DHCP option, no metadata, no cloud-init entry. The
+# server cannot discover them; the addresses come from the provider panel and
+# get configured here explicitly.
+#
+# Always /32 with the host's existing gateway, never the primary's prefix: the
+# surrounding block is shared with other customers, so claiming a wider prefix
+# would blackhole addresses that are not ours.
+- name: Configure additional IPv4 addresses (netplan drop-in)
+  ansible.builtin.copy:
+    dest: /etc/netplan/62-pivx-ipv4-extra.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          {{ ansible_default_ipv4.interface }}:
+            addresses:
+      {% for a in host_ipv4_extra %}
+              - "{{ a }}/32"
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0600"
+  when: host_ipv4_extra | default([]) | length > 0
+  notify: netplan apply
+
+- name: Remove the extra-IPv4 drop-in when none are defined
+  ansible.builtin.file:
+    path: /etc/netplan/62-pivx-ipv4-extra.yaml
+    state: absent
+  when: host_ipv4_extra | default([]) | length == 0
+  notify: netplan apply
+
+# Contabo's upstream drops the NDP entry for an IPv6 address that has not
+# sourced traffic recently, which makes a listen-only pivxd instance silently
+# undialable while every other metric stays green. Measured: 49 of 50 IPv6
+# instances had zero inbound, and an unreachable address came back the instant
+# it sent three pings. A cheap periodic ping from each address keeps the
+# upstream entry alive.
+- name: Install the IPv6 NDP keepalive script
+  ansible.builtin.template:
+    src: ipv6-ndp-keepalive.sh.j2
+    dest: /usr/local/bin/ipv6-ndp-keepalive.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: host_ipv6 is defined
+
+- name: Install the IPv6 NDP keepalive units
+  ansible.builtin.template:
+    src: "ipv6-ndp-keepalive.{{ item }}.j2"
+    dest: "/etc/systemd/system/ipv6-ndp-keepalive.{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - service
+    - timer
+  when: host_ipv6 is defined
+  notify: reload systemd
+
+- name: Enable the IPv6 NDP keepalive timer
+  ansible.builtin.systemd:
+    name: ipv6-ndp-keepalive.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: host_ipv6 is defined
 
 # Contabo hands out a /17, so fleet hosts in the same /24 look on-link and the
 # kernel tries direct L2 delivery, which Contabo blocks between VPS (ARP goes

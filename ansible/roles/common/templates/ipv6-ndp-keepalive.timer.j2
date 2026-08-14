@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh upstream NDP entries every {{ ipv6_keepalive_interval | default(60) }}s
+
+[Timer]
+OnBootSec=45
+OnUnitActiveSec={{ ipv6_keepalive_interval | default(60) }}
+AccuracySec=5
+RandomizedDelaySec=10
+
+[Install]
+WantedBy=timers.target

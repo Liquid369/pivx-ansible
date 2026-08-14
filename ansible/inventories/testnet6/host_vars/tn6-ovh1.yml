@@ -2,7 +2,9 @@
 #
 # OVH, Sydney AU (ap-southeast-syd)
 # Plan class: contabo_6vcpu
-# 6 PIVX masternode instances (2 IPv4-port-split, 2 IPv6, 2 Tor).
+# 10 PIVX masternode instances (2 IPv4-port-split, 6 IPv6, 2 Tor).
+# OVH routes the whole /64, so the IPv6 slots scale here for free;
+# Contabo is capped at ::1/::2 and stays at 2.
 #
 # Single IPv4 per host, so mn02 shares it on a different P2P port
 # (uniqueness is on ip:port). OVH configures IPv6 as /128 with an
@@ -15,12 +17,46 @@ provider_plan: ovh_syd
 chaos_group: chaos_ovh
 node_role: masternode
 host_label: tn6-ovh1
-pivx_instances_expected: 6
+pivx_instances_expected: 15
 
 host_ipv4:   "139.99.130.196"
 host_ipv4_2: "139.99.130.196"    # single IPv4 — shared, mn02 uses port 51484
+
+# Additional IPv4 (OVH failover IPs). Routed to this server at OVH's edge
+# and NOT announced to the OS in any way, so they are configured as /32
+# here from the OVH manager listing. They are in an unrelated range to the
+# primary: that /24 is shared infrastructure and its .254 is the gateway,
+# so neighbouring addresses are never ours to take.
+#
+# Every address is verified to accept inbound TCP on 51474 from outside the
+# provider before being counted — ping alone does not prove a masternode
+# can be dialled.
+#
+# All of these sit in one /16, so peer selection treats them as a single
+# netgroup (net.cpp:1807 allows one outbound per group). They add to the
+# masternode count; they do not multiply organic inbound.
+host_ipv4_extra:
+  - "51.161.143.181"
+  - "51.161.156.162"
+  - "51.161.156.163"
+  - "51.161.156.164"
+  - "51.161.156.165"
+  - "51.161.156.166"
 host_ipv6:   "2402:1f00:8100:2c4::1"
 host_ipv6_2: "2402:1f00:8100:2c4::2"
+host_ipv6_3:   "2402:1f00:8100:2c4::3"
+host_ipv6_4:   "2402:1f00:8100:2c4::4"
+host_ipv6_5:   "2402:1f00:8100:2c4::5"
+host_ipv6_6:   "2402:1f00:8100:2c4::6"
+
+# OVH routes the whole /64, so the IPv6 cohort scales here at no cost.
+# Contabo is capped at ::1/::2, which is why only the OVH hosts carry these.
+host_ipv6_extra:
+  - "{{ host_ipv6_3 }}"
+  - "{{ host_ipv6_4 }}"
+  - "{{ host_ipv6_5 }}"
+  - "{{ host_ipv6_6 }}"
+
 host_ipv6_prefixlen: 128
 host_ipv6_gateway: "2402:1f00:8100:2ff:ff:ff:ff:ff"
 
@@ -62,9 +98,9 @@ pivx_instances:
     protocol_class: ipv4
     cohort: ipv4
     role: masternode
-    bind_addr: "{{ host_ipv4_2 }}"
-    external_ip: "{{ host_ipv4_2 }}"
-    p2p_port: 51484
+    bind_addr: "{{ host_ipv4_extra[0] }}"
+    external_ip: "{{ host_ipv4_extra[0] }}"
+    p2p_port: 51474
     rpc_port: 51488
     rpc_user: rpc_v4mn02
     rpc_password: "{{ vault_pivx_rpc_password }}"
@@ -85,7 +121,7 @@ pivx_instances:
     role: masternode
     bind_addr: "[{{ host_ipv6 }}]"
     external_ip: "{{ host_ipv6 }}"
-    p2p_port: 51494
+    p2p_port: 51474
     rpc_port: 51498
     rpc_user: rpc_v6mn03
     rpc_password: "{{ vault_pivx_rpc_password }}"
@@ -106,7 +142,7 @@ pivx_instances:
     role: masternode
     bind_addr: "[{{ host_ipv6_2 }}]"
     external_ip: "{{ host_ipv6_2 }}"
-    p2p_port: 51504
+    p2p_port: 51474
     rpc_port: 51508
     rpc_user: rpc_v6mn04
     rpc_password: "{{ vault_pivx_rpc_password }}"
@@ -159,6 +195,195 @@ pivx_instances:
     datadir: "/var/lib/pivx/tn6-ovh1-tor-mn06"
     logdir: "/var/log/pivx/tn6-ovh1-tor-mn06"
     confdir: "/etc/pivx/tn6-ovh1-tor-mn06"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v6-mn07
+    enabled: true
+    slot: 7
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6_3 }}]"
+    external_ip: "{{ host_ipv6_3 }}"
+    p2p_port: 51474
+    rpc_port: 51548
+    rpc_user: rpc_v6mn07
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v6-mn07"
+    logdir: "/var/log/pivx/tn6-ovh1-v6-mn07"
+    confdir: "/etc/pivx/tn6-ovh1-v6-mn07"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v6-mn08
+    enabled: true
+    slot: 8
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6_4 }}]"
+    external_ip: "{{ host_ipv6_4 }}"
+    p2p_port: 51474
+    rpc_port: 51558
+    rpc_user: rpc_v6mn08
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v6-mn08"
+    logdir: "/var/log/pivx/tn6-ovh1-v6-mn08"
+    confdir: "/etc/pivx/tn6-ovh1-v6-mn08"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v6-mn09
+    enabled: true
+    slot: 9
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6_5 }}]"
+    external_ip: "{{ host_ipv6_5 }}"
+    p2p_port: 51474
+    rpc_port: 51568
+    rpc_user: rpc_v6mn09
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v6-mn09"
+    logdir: "/var/log/pivx/tn6-ovh1-v6-mn09"
+    confdir: "/etc/pivx/tn6-ovh1-v6-mn09"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v6-mn10
+    enabled: true
+    slot: 10
+    protocol_class: ipv6
+    cohort: ipv6
+    role: masternode
+    bind_addr: "[{{ host_ipv6_6 }}]"
+    external_ip: "{{ host_ipv6_6 }}"
+    p2p_port: 51474
+    rpc_port: 51578
+    rpc_user: rpc_v6mn10
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v6-mn10"
+    logdir: "/var/log/pivx/tn6-ovh1-v6-mn10"
+    confdir: "/etc/pivx/tn6-ovh1-v6-mn10"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v4-mn15
+    enabled: true
+    slot: 15
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4_extra[1] }}"
+    external_ip: "{{ host_ipv4_extra[1] }}"
+    p2p_port: 51474
+    rpc_port: 51628
+    rpc_user: rpc_v4mn15
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v4-mn15"
+    logdir: "/var/log/pivx/tn6-ovh1-v4-mn15"
+    confdir: "/etc/pivx/tn6-ovh1-v4-mn15"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v4-mn16
+    enabled: true
+    slot: 16
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4_extra[2] }}"
+    external_ip: "{{ host_ipv4_extra[2] }}"
+    p2p_port: 51474
+    rpc_port: 51638
+    rpc_user: rpc_v4mn16
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v4-mn16"
+    logdir: "/var/log/pivx/tn6-ovh1-v4-mn16"
+    confdir: "/etc/pivx/tn6-ovh1-v4-mn16"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v4-mn17
+    enabled: true
+    slot: 17
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4_extra[3] }}"
+    external_ip: "{{ host_ipv4_extra[3] }}"
+    p2p_port: 51474
+    rpc_port: 51648
+    rpc_user: rpc_v4mn17
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v4-mn17"
+    logdir: "/var/log/pivx/tn6-ovh1-v4-mn17"
+    confdir: "/etc/pivx/tn6-ovh1-v4-mn17"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v4-mn18
+    enabled: true
+    slot: 18
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4_extra[4] }}"
+    external_ip: "{{ host_ipv4_extra[4] }}"
+    p2p_port: 51474
+    rpc_port: 51658
+    rpc_user: rpc_v4mn18
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v4-mn18"
+    logdir: "/var/log/pivx/tn6-ovh1-v4-mn18"
+    confdir: "/etc/pivx/tn6-ovh1-v4-mn18"
+    mining_enabled: false
+    staking_enabled: false       # set true in Phase 3 once coins arrive
+    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    bls_operator_key: "REPLACE_ME"
+    extra_conf: []
+
+  - name: tn6-ovh1-v4-mn19
+    enabled: true
+    slot: 19
+    protocol_class: ipv4
+    cohort: ipv4
+    role: masternode
+    bind_addr: "{{ host_ipv4_extra[5] }}"
+    external_ip: "{{ host_ipv4_extra[5] }}"
+    p2p_port: 51474
+    rpc_port: 51668
+    rpc_user: rpc_v4mn19
+    rpc_password: "{{ vault_pivx_rpc_password }}"
+    datadir: "/var/lib/pivx/tn6-ovh1-v4-mn19"
+    logdir: "/var/log/pivx/tn6-ovh1-v4-mn19"
+    confdir: "/etc/pivx/tn6-ovh1-v4-mn19"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
     masternode_enabled: false    # set true in Phase 4 after DMN registration

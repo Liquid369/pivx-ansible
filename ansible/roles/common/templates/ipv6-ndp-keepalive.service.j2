@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh upstream NDP entries for this host's IPv6 addresses
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ipv6-ndp-keepalive.sh
+TimeoutStartSec=60
+Nice=15
