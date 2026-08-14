@@ -57,6 +57,22 @@
     mode: "0755"
   when: not pivxd_stat.stat.exists
 
+# 5.6.99-tn6 is a local build, not a published release, so pivx_archive_url
+# 404s. Set pivx_local_tarball to install from a tarball on the control node
+# instead. Its top-level directory name does not matter - the extract task
+# strips it. Skip pivx_checksum on this path: that hash belongs to the release
+# artifact, and re-tarring the same binaries produces a different archive.
+# Verify the binaries themselves after install (sha256 of bin/pivxd) rather
+# than trusting the archive hash.
+- name: Stage PIVX archive from control node
+  ansible.builtin.copy:
+    src: "{{ pivx_local_tarball }}"
+    dest: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    mode: "0644"
+  when:
+    - not pivxd_stat.stat.exists
+    - pivx_local_tarball | default('') != ''
+
 - name: Download PIVX archive
   ansible.builtin.get_url:
     url: "{{ pivx_archive_url }}"
@@ -64,7 +80,9 @@
     checksum: "{{ pivx_checksum }}"
     mode: "0644"
     timeout: 120
-  when: not pivxd_stat.stat.exists
+  when:
+    - not pivxd_stat.stat.exists
+    - pivx_local_tarball | default('') == ''
 
 - name: Extract PIVX archive to versioned directory
   ansible.builtin.unarchive:

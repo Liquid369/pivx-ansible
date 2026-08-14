@@ -6,6 +6,12 @@
 # Binary version — should be set in group_vars/all/main.yml
 pivx_version: "5.6.1"
 
+# Path on the CONTROL NODE to a prebuilt tarball. When set, the binary is
+# copied up from here instead of downloaded from pivx_archive_url. Needed while
+# the testnet6 build is a local artifact with no GitHub release behind it.
+#   ansible-playbook ... -e pivx_local_tarball=~/pivx-releases/pivx-5.6.99-tn6.tar.gz
+pivx_local_tarball: ""
+
 # Versioned install layout:
 #   /opt/pivx/releases/<version>/   ← immutable install per version
 #   /opt/pivx/current               ← symlink to active version
