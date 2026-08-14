@@ -1,21 +1,44 @@
 ---
 # playbooks/lifecycle/start_bootstrap_mining.yml
 #
-# Starts CPU mining on all bootstrap_miner hosts.
+# Mines the PoW window from the single designated miner instance.
+#
+# Targets the bootstrap_miners group, but only ONE instance in the fleet
+# actually mines: the one with `mining_enabled: true` in host_vars, currently
+# tn6-cb1-seed01. Hosts in the group with no mining-enabled instance end early
+# and do nothing. Several instances racing on the same height fork the chain
+# constantly, so the role asserts there is exactly one per host and refuses to
+# run otherwise.
 #
 # WHEN TO RUN:
 #   - After fresh chain wipe + deploy-pivx completes
 #   - lifecyle_phase must be `bootstrap_mining` in group_vars
 #
 # WHAT IT DOES:
-#   1. Verifies each mining instance's pivxd is running
-#   2. Calls `setgenerate true <threads>` via RPC on each instance
-#   3. Prints mining status and current block heights
+#   1. Verifies every enabled instance's pivxd is running
+#   2. Works out how many blocks are left to mining_phase_target_height - 1
+#   3. Pulls an address from the miner's own wallet with getnewaddress
+#   4. Mines with `generatetoaddress <batch> <address>`, in batches of
+#      bootstrap_mining_batch (default 25)
+#   5. Reports the height reached
+#
+# This build has neither setgenerate nor getmininginfo — generatetoaddress is
+# the only mining RPC available, and it mines synchronously.
+#
+# PoW stops one block short of mining_phase_target_height on purpose. UPGRADE_POS
+# activates at 201, so block 201 has to be staked rather than mined.
+#
+# Resumable: generatetoaddress is batched, so if a run is interrupted or comes
+# up short, just run it again and it picks up from the current height.
 #
 # PREREQUISITES:
 #   - pivxd instances must already be running (make deploy-pivx first)
-#     (rewards go to each miner instance's own wallet — no address needed)
 #   - lifecycle_phase=bootstrap_mining in group_vars/all/main.yml
+#
+# Rewards land in the miner instance's own wallet, so no address needs to be
+# supplied — the role asks the wallet for one. Later collateral is cut from that
+# same wallet. Each coinbase matures 15 blocks after the block that created it
+# (nCoinbaseMaturity), so the balance shows as immature until then.
 #
 # Usage:
 #   make start-bootstrap-mining

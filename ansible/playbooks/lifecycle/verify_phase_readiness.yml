@@ -108,25 +108,42 @@
         label: "{{ item.item.name }}"
 
     # ------------------------------------------------------------------ #
-    #  Phase 2: mining info                                               #
+    #  Phase 2: miner wallet state                                        #
     # ------------------------------------------------------------------ #
-    - name: "[Phase 2] Get mining info per mining instance"
+    # getmininginfo does not exist in this build, so the old check here errored
+    # on every run and its result was never read. What actually matters for
+    # phase 2 is the miner wallet: the coinbases land in it and the masternode
+    # collateral is cut from it later, so report balance and maturity.
+    - name: "[Phase 2] Get miner wallet state"
       ansible.builtin.command:
         argv:
           - "{{ pivx_cli }}"
           - "-conf={{ item.confdir }}/pivx.conf"
           - "-datadir={{ item.datadir }}"
-          - "getmininginfo"
+          - "getwalletinfo"
       loop: >-
         {{ enabled_instances | selectattr('mining_enabled', 'defined')
                               | selectattr('mining_enabled', 'equalto', true)
                               | list }}
       loop_control:
         label: "{{ item.name }}"
-      register: mining_info
+      register: miner_wallet
       changed_when: false
-      failed_when: false
       when: lifecycle_phase == 'bootstrap_mining'
+
+    - name: "[Phase 2] Report miner wallet balance and maturity"
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.item.name }}: spendable={{ (item.stdout | from_json).balance }}
+          immature={{ (item.stdout | from_json).immature_balance }}
+          txcount={{ (item.stdout | from_json).txcount }}
+          (coinbases mature 15 blocks after the block that made them)
+      loop: "{{ miner_wallet.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - lifecycle_phase == 'bootstrap_mining'
+        - item.stdout is defined
 
     # ------------------------------------------------------------------ #
     #  Phase 3: staking status                                            #

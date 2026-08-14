@@ -1,22 +1,28 @@
 # group_vars/bootstrap_miners.yml
 # Applied to all hosts in the `bootstrap_miners` inventory group.
-# These are the nodes that mine blocks during Phase 2 to bootstrap the chain.
 #
-# PIVX testnet uses PoW (Proof of Work) for the initial block period until
-# the PoS activation height (vUpgrades[UPGRADE_POS].nActivationHeight = 201
-# in chainparams.cpp testnet params). After that point, the network
-# transitions to PoS consensus and setgenerate refuses to mine.
+# The group is the targeting envelope for the mining plays, not the set of hosts
+# that mine. Exactly ONE instance in the fleet mines — the one carrying
+# `mining_enabled: true` in host_vars, currently tn6-cb1-seed01. The miner role
+# asserts that and refuses to run if a host has more than one, because several
+# instances racing on the same height fork the chain. The other hosts in this
+# group end early and just sync.
 #
-# Note: PoW rewards are paid to the mining node's own wallet — there is no
-# miningaddress option in this build.
+# PIVX testnet uses PoW for the initial block period until the PoS activation
+# height (vUpgrades[UPGRADE_POS].nActivationHeight = 201 in chainparams.cpp
+# testnet params). PoW is mined to 200 only; block 201 has to be staked.
+#
+# Note: PoW rewards go to the mining instance's own wallet. There is no
+# miningaddress option in this build — the role calls getnewaddress and hands
+# the result to generatetoaddress.
 
-# Override: these nodes have mining enabled by default at the group level.
-# Individual instances override this with their mining_enabled flag.
+# Group-level intent flag. Nothing reads it today, the miner role selects on
+# each instance's own mining_enabled, which is what actually decides who
+# mines. Kept because it documents the group's purpose, but setting it will
+# not switch mining on.
 bootstrap_mining_enabled: true
 
-# Mining threads — keep low on testnet (1-2 is plenty for low-difficulty early blocks)
-bootstrap_mining_threads: 1
-
-# gen=1 / genproclimit are emitted by pivx.conf.j2 for instances with
-# mining_enabled=true while lifecycle_phase == bootstrap_mining; the
-# transition_to_pos playbook re-renders pivx.conf with mining disabled.
+# pivx.conf.j2 pins gen=0 for every instance unconditionally. The built-in miner
+# thread is never used: it would race generatetoaddress for the same height, and
+# it is the loop that filled the seeder disks before the miner fix. Mining
+# happens only while `make start-bootstrap-mining` is running.

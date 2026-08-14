@@ -145,9 +145,26 @@ Or watch continuously:
 watch -n 30 make verify-readiness
 ```
 
-Mining ~201 blocks with 1 CPU thread takes approximately 30–90 minutes
-depending on CPU speed. You can increase `bootstrap_mining_threads` in
-`group_vars/bootstrap_miners.yml` to speed it up.
+Budget a couple of hours for the 200-block PoW window, not minutes. Measured on
+this fleet: the first blocks come in seconds while difficulty is still at the
+floor, then retargeting pushes spacing up toward `nTargetSpacing` (60s on
+testnet) and individual blocks ran 100–195s at the peak. Spacing oscillates
+rather than climbing steadily — an idle gap retargets difficulty back down, so
+resumed runs start fast again.
+
+There is no thread setting to turn up: `generatetoaddress` takes only a block
+count and an address. It mines synchronously, so `start-bootstrap-mining` blocks
+until the window is done; run `verify-readiness` from a second shell to watch
+progress (pivxd serves other RPC calls fine while mining).
+
+The play is resumable — mining is batched (`bootstrap_mining_batch`, default 25)
+and it recomputes what is left from the current height each run, so an
+interrupted window just needs the command again.
+
+Note `pivx-cli` can give up on a long batch with `couldn't connect to server:
+timeout reached` while **the daemon keeps mining and finishes the batch**. That
+is why the play waits on the chain height rather than on the RPC call returning,
+and why a client timeout no longer fails the run.
 
 For the full 90-masternode target, 201 blocks may not produce enough spendable
 collateral. Treat 201 as the minimum transition height, then continue building
@@ -163,8 +180,10 @@ make transition-to-pos
 ```
 
 This:
-1. Verifies height ≥ 201
-2. Calls `setgenerate false` on all mining instances
+1. Verifies the PoW window is complete (height ≥ 200). PoW stops one short of
+   201 on purpose — UPGRADE_POS activates at 201, so that block must be staked.
+2. Confirms no instance was left with `gen=1`. Nothing needs stopping:
+   `generatetoaddress` is synchronous and finished when the mining play returned.
 3. Regenerates pivx.conf with `gen=0`
 4. Restarts affected instances
 

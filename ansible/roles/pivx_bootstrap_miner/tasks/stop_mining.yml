@@ -1,13 +1,18 @@
 ---
 # roles/pivx_bootstrap_miner/tasks/stop_mining.yml
 #
-# Stops CPU mining on all mining-enabled instances via RPC.
-# Called from playbooks/lifecycle/stop_bootstrap_mining.yml.
+# Confirms PoW mining is not active. Called from
+# playbooks/lifecycle/stop_bootstrap_mining.yml.
 #
-# Note: This stops mining at runtime only.
-# To permanently disable mining, set lifecycle_phase=pos_transition in
-# group_vars/all/main.yml and re-run `make deploy-pivx`.
-# That will regenerate pivx.conf with gen=0 and restart instances.
+# There is no runtime mining to switch off. This build has no setgenerate and
+# no background miner thread reachable over RPC — generatetoaddress is the only
+# mining call and it runs synchronously, so mining only happens while
+# `make start-bootstrap-mining` is executing and has already stopped by the time
+# that play returns. pivx.conf also pins gen=0 (the built-in miner loop is what
+# filled the seeder disks before the miner fix).
+#
+# So this checks the two things that could still leave a miner running and
+# reports the height reached, rather than issuing a stop that has no meaning.
 
 - name: Gather mining-enabled instances on this host
   ansible.builtin.set_fact:
@@ -17,37 +22,52 @@
                         | selectattr('mining_enabled', 'equalto', true)
                         | list }}
 
-- name: Stop CPU mining on each instance
-  ansible.builtin.command:
-    argv:
-      - "/opt/pivx/current/bin/pivx-cli"
-      - "-conf={{ item.confdir }}/pivx.conf"
-      - "-datadir={{ item.datadir }}"
-      - "setgenerate"
-      - "false"
-  loop: "{{ mining_instances }}"
-  loop_control:
-    label: "{{ item.name }}"
-  register: stopgen_result
-  changed_when: true
-  failed_when: stopgen_result.rc != 0
+- name: Nothing mining-enabled on this host
+  ansible.builtin.meta: end_host
+  when: mining_instances | length == 0
 
-- name: Confirm mining stopped
+- name: Check the built-in miner loop is disabled in pivx.conf
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -c
+      - "^gen=1"
+      - "{{ item.confdir }}/pivx.conf"
+  loop: "{{ mining_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: gen_check
+  changed_when: false
+  failed_when: false
+
+- name: Fail if any miner still has gen=1
+  ansible.builtin.assert:
+    that: item.stdout | trim | int == 0
+    msg: >-
+      {{ item.item.name }} still has gen=1 in pivx.conf. Set
+      lifecycle_phase=pos_transition and re-run `make deploy-pivx` to regenerate
+      the config with gen=0, otherwise it keeps mining after the PoS cutover.
+  loop: "{{ gen_check.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Report the height reached
   ansible.builtin.command:
     argv:
       - "/opt/pivx/current/bin/pivx-cli"
       - "-conf={{ item.confdir }}/pivx.conf"
-      - "-datadir={{ item.datadir }}"
-      - "getmininginfo"
+      - "getblockcount"
   loop: "{{ mining_instances }}"
   loop_control:
     label: "{{ item.name }}"
-  register: mininginfo_result
+  register: miner_height
   changed_when: false
 
-- name: Show final mining status
+- name: Show miner state
   ansible.builtin.debug:
-    msg: "[{{ item.item.name }}] mininginfo after stop: {{ item.stdout }}"
-  loop: "{{ mininginfo_result.results }}"
+    msg: >-
+      {{ item.item.name }} at height {{ item.stdout | trim }}, gen=0, no runtime
+      miner to stop.
+  loop: "{{ miner_height.results }}"
   loop_control:
     label: "{{ item.item.name }}"

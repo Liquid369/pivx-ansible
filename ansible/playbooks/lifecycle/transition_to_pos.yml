@@ -5,12 +5,15 @@
 # to Proof-of-Stake consensus (Phase 3).
 #
 # WHEN TO RUN:
-#   - After chain height >= mining_phase_target_height
+#   - After the PoW window is complete, i.e. height >= mining_phase_target_height - 1
 #   - Verify with: make verify-readiness
 #
 # WHAT IT DOES:
-#   1. Verifies chain height is past the PoS activation threshold
-#   2. Stops mining (runtime)
+#   1. Verifies the PoW window is complete (height >= target - 1). PoW stops one
+#      block short because UPGRADE_POS activates AT mining_phase_target_height,
+#      so that block has to be staked rather than mined.
+#   2. Confirms no miner was left with gen=1 (there is no runtime mining to stop
+#      — generatetoaddress is synchronous and this build has no setgenerate)
 #   3. Sets lifecycle_phase NOTE: This playbook does NOT auto-edit group_vars.
 #      The operator must update lifecycle_phase manually (see post-tasks message).
 #   4. Re-renders pivx.conf with gen=0 for all instances on miner hosts
@@ -18,7 +21,7 @@
 #   6. Optionally enables staking on nodes that hold testnet coins
 #
 # PREREQUISITES:
-#   - Chain height >= mining_phase_target_height
+#   - Chain height >= mining_phase_target_height - 1
 #   - Nodes should be synchronized
 #   - staking wallets (if using staking) should be unlocked/configured
 #
@@ -42,20 +45,29 @@
       register: current_height
       changed_when: false
 
-    - name: Check height is past PoS activation
+    # Gate on the last PoW block, not on mining_phase_target_height itself.
+    # UPGRADE_POS activates AT mining_phase_target_height, so that block has to
+    # be staked and PoW stops one short — the miner role mines to
+    # mining_phase_target_height - 1 by design. Requiring the activation height
+    # here deadlocked the pipeline: mining completes at 200, this check demanded
+    # 201, and the error told the operator to keep mining something PoW cannot
+    # produce.
+    - name: Check the PoW window is complete
       ansible.builtin.fail:
         msg: >
-          Chain height {{ current_height.stdout | trim }} is below
-          PoS activation threshold {{ mining_phase_target_height }}.
-          Continue mining and retry when height exceeds that value.
+          Chain height {{ current_height.stdout | trim }} is below the last PoW
+          block {{ (mining_phase_target_height | int) - 1 }}.
+          Continue mining and retry. Note PoW cannot pass that height —
+          {{ mining_phase_target_height }} is the first staked block.
           Check: make verify-readiness
-      when: (current_height.stdout | trim | int) < (mining_phase_target_height | int)
+      when: (current_height.stdout | trim | int) < ((mining_phase_target_height | int) - 1)
 
     - name: Confirm height is ready
       ansible.builtin.debug:
         msg: >
           ✓ Chain height {{ current_height.stdout | trim }} >=
-          threshold {{ mining_phase_target_height }} — proceeding.
+          last PoW block {{ (mining_phase_target_height | int) - 1 }} — proceeding.
+          Block {{ mining_phase_target_height }} onward must be staked.
 
 - name: "PHASE 2→3 — Stop mining on miner hosts"
   hosts: bootstrap_miners

@@ -1,15 +1,24 @@
 ---
 # roles/pivx_bootstrap_miner/defaults/main.yml
 
-# Mining threads — keep low, testnet difficulty is minimal
-bootstrap_mining_threads: 1
+# Blocks per generatetoaddress call. The call mines synchronously and only
+# returns when the batch is done, so batching keeps any single RPC from hanging
+# for the whole PoW window and lets an interrupted run resume from the height it
+# reached.
+bootstrap_mining_batch: 25
 
-# NOTE: there is no mining address option in this build — setgenerate mines
-# PoW rewards to the instance's own wallet.
+# NOTE: generatetoaddress takes an explicit address, and the role asks the miner
+# wallet for one with getnewaddress, so rewards land in that instance's wallet.
+# There is no setgenerate and no -miningaddress option in this build.
+#
+# There is deliberately no thread count here. generatetoaddress takes only
+# nblocks and an address, so the old bootstrap_mining_threads knob controlled
+# nothing.
 
-# Whether to start mining immediately after configuration
-bootstrap_mining_start_on_deploy: true
-
-# RPC wait retries when checking mining status
-bootstrap_mining_rpc_retries: 30
-bootstrap_mining_rpc_delay: 10
+# How long to keep polling for the chain to reach the PoW target after the
+# batches are issued. pivx-cli can time out on a long batch while the daemon
+# carries on mining, so the play waits on the height rather than on the RPC
+# call returning. 120 x 30s = 1h of patience, which covers a slow tail as
+# difficulty retargets upward.
+bootstrap_mining_wait_retries: 120
+bootstrap_mining_wait_delay: 30

@@ -32,7 +32,7 @@ must choose its own, and the choice defines our phase schedule:
 
 | Upgrade | Stock testnet height | What it gates |
 |---|---|---|
-| `UPGRADE_POS` / `POS_V2` | 201 | PoW ends; PoS block validity. `setgenerate` refuses past this height |
+| `UPGRADE_POS` / `POS_V2` | 201 | PoW ends; PoS block validity. PoW is mined to 200 only — block 201 must be staked |
 | `UPGRADE_ZC*`, `BIP65`, `V3_4`, `V4_0`, `V5_0` | 201 (batched) | script/zerocoin/sapling history — fine to batch early on a test chain |
 | `UPGRADE_V5_2` … `V5_6` | staggered | v5-era rules (e.g. exchange addrs at V5_6); batch early unless testing them |
 | `UPGRADE_V6_0` | **NO_ACTIVATION_HEIGHT** | DMN/DIP3: ProRegTx special txs, deterministic MN list, LLMQ quorum commitments, new MN payment rules |
@@ -129,17 +129,20 @@ Above it, PoS becomes valid.
 ### Commands
 ```bash
 # Edit group_vars/all/main.yml: lifecycle_phase: bootstrap_mining
-# Edit cb1/cb2/cb3 seeders host_vars: mining_enabled: true
+# Set mining_enabled: true on exactly ONE instance (currently tn6-cb1-seed01).
+# More than one forks the chain, and the miner role refuses to run if it finds
+# several on a host.
 
 # Push new pivx.conf to all instances
 make deploy-pivx
 
-# Activate runtime mining on cb1/cb2/cb3 seeders (setgenerate true)
+# Mine the PoW window from the single miner instance. This runs
+# generatetoaddress synchronously in batches and blocks until it reaches 200,
+# so expect the play to sit there for a while. Rerun to resume if interrupted.
 make start-bootstrap-mining
 
-# Monitor height
+# Monitor height (from another shell, since the miner play blocks)
 make verify-readiness
-# Outputs: "Mining in progress (N/201)" until ready
 ```
 
 ### Monitoring
@@ -177,8 +180,9 @@ coin production to wallets that will stake.
 make transition-to-pos
 
 # Ansible will:
-# 1. Verify height threshold
-# 2. Call setgenerate false on mining instances
+# 1. Verify the PoW window is complete (height >= 200)
+# 2. Confirm no miner was left with gen=1 — there is no runtime mining to stop,
+#    generatetoaddress already finished when start-bootstrap-mining returned
 # 3. Set lifecycle_phase → pos_transition internally
 # 4. Regenerate pivx.conf (gen=0) and restart instances
 
@@ -189,8 +193,10 @@ make deploy-pivx   # push final gen=0 conf everywhere
 
 ### Expected result
 All instances are running with no PoW mining activity. Once staking wallets are
-funded, unlocked, and mature, the chain should advance through PoS.
-`getmininginfo` should report `networkhashps: 0`.
+funded, unlocked, and mature, the chain should advance through PoS. There is no
+`getmininginfo` in this build to check against — confirm instead that every
+pivx.conf has `gen=0` and that height keeps climbing past 201, which can only
+happen via staking.
 
 ---
 
@@ -408,8 +414,8 @@ make start-bootstrap-mining
 
 | Phase                  | `lifecycle_phase` value    | pivx.conf effect                    |
 |------------------------|----------------------------|--------------------------------------|
-| Fresh chain            | `bootstrap_mining`          | gen=0 (before mining starts)         |
-| Mining active          | `bootstrap_mining`          | gen=1, genproclimit=N on miners      |
+| Fresh chain            | `bootstrap_mining`          | gen=0                                |
+| Mining active          | `bootstrap_mining`          | gen=0 — mining is driven by the generatetoaddress play, not the miner thread |
 | Transition             | `pos_transition`            | gen=0 everywhere                     |
 | Staking                | `staking`                  | staking=1 on staking instances       |
 | Masternodes + quorums  | `masternode_quorum`         | masternode=1 + blsprivkey on DMNs    |

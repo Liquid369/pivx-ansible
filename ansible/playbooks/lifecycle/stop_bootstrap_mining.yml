@@ -1,9 +1,17 @@
 ---
 # playbooks/lifecycle/stop_bootstrap_mining.yml
 #
-# Stops CPU mining on all bootstrap_miner hosts via RPC.
+# Confirms PoW mining is not active, and reports final block heights.
 #
-# NOTE: This stops mining at RUNTIME only.
+# There is nothing to stop at runtime. generatetoaddress is the only mining RPC
+# in this build and it mines synchronously, so mining ends when
+# `make start-bootstrap-mining` returns. There is no setgenerate and pivx.conf
+# pins gen=0, so no background miner thread exists either.
+#
+# What this play is still good for is the pre-cutover check: it asserts no
+# instance was left with gen=1 in its config, which would keep mining past the
+# PoS activation, and prints the height each miner reached.
+#
 # To permanently disable mining: set lifecycle_phase=pos_transition in
 # group_vars/all/main.yml, then run `make deploy-pivx`.
 # That regenerates pivx.conf with gen=0 and restarts instances.
@@ -51,9 +59,11 @@
       ansible.builtin.debug:
         msg: |
           ============================================================
-          Mining stopped on all bootstrap miners.
+          Mining confirmed inactive on all bootstrap miners.
 
-          Runtime mining is stopped. pivxd instances are still running.
+          Nothing was stopped: generatetoaddress mines synchronously, so mining
+          already ended when start-bootstrap-mining returned, and gen=0 means no
+          background miner thread. pivxd instances are still running.
 
           TO MAKE THIS PERMANENT:
           1. Edit group_vars/all/main.yml:

@@ -80,18 +80,54 @@
   # generatetoaddress blocks until it returns. Batched so a single RPC call
   # is not left hanging for the whole window, and so a partial run can be
   # resumed by rerunning the play.
+  #
+  # The last batch mines only the remainder, never a full batch. Mining a fixed
+  # bootstrap_mining_batch every pass overshoots whenever blocks_needed is not a
+  # multiple of it: from height 1 that lands on 201, and 201 is exactly the block
+  # UPGRADE_POS requires to be staked rather than mined.
+  #
+  # A batch can outlast the RPC client. Difficulty retargets upward fast here
+  # because we mine far under target spacing — it went from ~22s to ~170s per
+  # block inside the first 70 blocks — so pivx-cli eventually returns
+  #   error: couldn't connect to server: timeout reached
+  # and exits non-zero. The daemon does NOT stop: it finishes the batch it was
+  # asked for. That was verified — a run whose client died at height 59 kept
+  # going and landed on the requested 70 with nothing attached.
+  #
+  # So a failed client call is not a failed batch, and this must not abort the
+  # play. Note -rpcclienttimeout=0 does not help: despite the help text saying 0
+  # means no timeout, it errored after 50s. The wait task below is what actually
+  # establishes whether the blocks got mined.
   ansible.builtin.command:
     argv:
       - "/opt/pivx/current/bin/pivx-cli"
       - "-conf={{ miner.confdir }}/pivx.conf"
       - "generatetoaddress"
-      - "{{ bootstrap_mining_batch | default(25) | int }}"
+      - "{{ [bootstrap_mining_batch | default(25) | int,
+             (blocks_needed | int) - (item * (bootstrap_mining_batch | default(25) | int))] | min }}"
       - "{{ mine_addr.stdout | trim }}"
   register: mine_batch
   changed_when: true
+  failed_when: false
   loop: "{{ range(0, ((blocks_needed | int) / (bootstrap_mining_batch | default(25) | int)) | round(0, 'ceil') | int) | list }}"
   loop_control:
     label: "batch {{ item + 1 }}"
+
+- name: Wait for the chain to reach the PoW target
+  # Polls instead of trusting the batch calls to have returned cleanly, because
+  # the daemon keeps mining after a client timeout. Generous retry budget: block
+  # spacing climbs as difficulty retargets, so late blocks take minutes each.
+  ansible.builtin.command:
+    argv:
+      - "/opt/pivx/current/bin/pivx-cli"
+      - "-conf={{ miner.confdir }}/pivx.conf"
+      - "getblockcount"
+  register: mine_wait
+  changed_when: false
+  until: (mine_wait.stdout | trim | int) >= (pow_last_block | int)
+  retries: "{{ bootstrap_mining_wait_retries | default(120) }}"
+  delay: "{{ bootstrap_mining_wait_delay | default(30) }}"
+  failed_when: false
 
 - name: Confirm the height after mining
   ansible.builtin.command:
