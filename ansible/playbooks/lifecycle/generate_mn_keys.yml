@@ -1,0 +1,128 @@
+---
+# playbooks/lifecycle/generate_mn_keys.yml
+#
+# Generates one legacy masternode private key per MN-capable instance and writes
+# a vault-ready YAML block to switchover/, which is gitignored so the keys never
+# reach a commit. Read-only against the chain.
+#
+#   make generate-mn-keys
+#
+# createmasternodekey just returns a fresh key — it is not bound to the node that
+# produced it — so they are all generated on the controller wallet in one pass
+# rather than fanning out across the fleet.
+#
+# The output is NOT written into group_vars automatically: vault.yml is
+# encrypted and gitignored, so merging is a deliberate operator step.
+#
+#   1. make generate-mn-keys
+#   2. merge ~/Projects/switchover/mn_legacy_keys.yml into
+#      group_vars/all/vault.yml under vault_mn_legacy_keys
+#   3. make deploy-pivx     (each MN instance gets masternodeprivkey)
+#   4. make setup-legacy-masternodes
+#
+# MN-capability is computed, not stored. CheckDefaultPort rejects any masternode
+# whose announced port is not 51474, so an instance qualifies only if it
+# announces that port: Tor instances always do (the hidden service publishes
+# 51474 regardless of the local bind), clearnet instances only when their
+# p2p_port is the default. That excludes v4-mn02 everywhere, and v6-mn04 on
+# hosts whose second IPv6 is unrouted.
+
+- name: Collect MN-capable instances
+  hosts: masternodes
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Work out which instances can be masternodes
+      ansible.builtin.set_fact:
+        mn_capable: >-
+          {{ pivx_instances
+             | selectattr('enabled', 'equalto', true)
+             | selectattr('role', 'equalto', 'masternode')
+             | selectattr('protocol_class', 'in', ['ipv4', 'ipv6', 'tor'])
+             | rejectattr('protocol_class', 'equalto', 'tor')
+             | selectattr('p2p_port', 'equalto', pivx_p2p_port_base)
+             | list
+             +
+             pivx_instances
+             | selectattr('enabled', 'equalto', true)
+             | selectattr('role', 'equalto', 'masternode')
+             | selectattr('protocol_class', 'equalto', 'tor')
+             | selectattr('onion_address', 'defined')
+             | rejectattr('onion_address', 'equalto', '')
+             | list }}
+
+    - name: Report per-host capability
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: {{ mn_capable | length }} MN-capable of
+          {{ pivx_instances | selectattr('role', 'equalto', 'masternode') | list | length }}
+          ({{ mn_capable | map(attribute='name') | map('regex_replace', '^.*-', '') | join(', ') }})
+
+- name: Generate a key per MN-capable instance
+  hosts: "{{ groups['seeders'][0] }}"
+  become: true
+  gather_facts: false
+
+  vars:
+    controller_instance: >-
+      {{ (pivx_instances | selectattr('role', 'equalto', 'seeder') | list | first).name }}
+    # Flatten every host's MN-capable list into one ordered fleet-wide list.
+    fleet_mns: >-
+      {{ groups['masternodes'] | sort
+         | map('extract', hostvars, 'mn_capable')
+         | select('defined') | list | flatten }}
+
+  tasks:
+    - name: Require the capability facts
+      ansible.builtin.assert:
+        that: fleet_mns | length > 0
+        msg: "No MN-capable instances found — run the whole playbook, not a --limit subset."
+
+    - name: Generate the keys
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf=/etc/pivx/{{ controller_instance }}/pivx.conf"
+          - "createmasternodekey"
+      register: mn_keys
+      changed_when: false
+      loop: "{{ fleet_mns }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Ensure the switchover directory exists
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../../../switchover"
+        state: directory
+        mode: "0750"
+      delegate_to: localhost
+      become: false
+
+    - name: Write the vault-ready key block
+      ansible.builtin.copy:
+        content: |
+          # Legacy masternode private keys, one per MN-capable instance.
+          #
+          # Merge this into group_vars/all/vault.yml (which is encrypted and
+          # gitignored) under vault_mn_legacy_keys, then run make deploy-pivx.
+          # pivx.conf.j2 looks the key up by instance name.
+          #
+          # Regenerating a key for a running masternode de-registers it: the node
+          # would announce with a key the network no longer associates with the
+          # collateral. Generate once, keep the file.
+          vault_mn_legacy_keys:
+          {% for r in mn_keys.results %}
+            {{ r.item.name }}: "{{ r.stdout | trim }}"
+          {% endfor %}
+        dest: "{{ playbook_dir }}/../../../switchover/mn_legacy_keys.yml"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Next steps
+      ansible.builtin.debug:
+        msg: >-
+          {{ mn_keys.results | length }} keys written to
+          switchover/mn_legacy_keys.yml. Merge into group_vars/all/vault.yml as
+          vault_mn_legacy_keys, then: make deploy-pivx && make setup-legacy-masternodes

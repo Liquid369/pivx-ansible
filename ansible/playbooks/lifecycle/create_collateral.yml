@@ -123,6 +123,17 @@
       register: lock_out
       changed_when: true
 
+    # switchover/ is gitignored (.gitignore:51) — the worksheet is working state
+    # that must never be committed. copy: does not create the parent, so make it
+    # here, or the play fails after the collateral is already cut on-chain.
+    - name: Ensure the switchover worksheet directory exists
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../../../switchover"
+        state: directory
+        mode: "0750"
+      delegate_to: localhost
+      become: false
+
     - name: Write the outpoint list for the switchover worksheet
       ansible.builtin.copy:
         content: |

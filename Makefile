@@ -199,9 +199,26 @@ create-collateral:
 	  $(if $(COLLATERAL_HOST),-e collateral_host=$(COLLATERAL_HOST),) \
 	  $(if $(DRY_RUN),-e dry_run=$(DRY_RUN),)
 
+## Generate one legacy masternode key per MN-capable instance.
+## Writes a vault-ready block to ../switchover/mn_legacy_keys.yml.
+generate-mn-keys:
+	$(PLAYBOOK) ansible/playbooks/lifecycle/generate_mn_keys.yml
+
+## Build masternode.conf on the controller wallet from the locked collateral.
+## Pass START=true to also run startmasternode once collateral has 15 confs.
+setup-legacy-masternodes:
+	$(PLAYBOOK) ansible/playbooks/lifecycle/setup_legacy_masternodes.yml \
+	  $(if $(START),-e start_masternodes=$(START),)
+
 ## Generate BLS keys and registration worksheets ahead of block 5000.
 prepare-switchover:
 	$(PLAYBOOK) ansible/playbooks/lifecycle/prepare_v6_switchover.yml
+
+## Purge cached peer addresses so nodes re-learn each other at their current
+## advertised addresses. MINE FIRST — see the playbook header. [COHORT=ipv6]
+reset-addrman:
+	$(PLAYBOOK) -f 15 ansible/playbooks/ops/reset_addrman.yml \
+	  $(if $(COHORT),-e cohort_filter=$(COHORT),)
 
 ## Diff host_vars onion addresses against what Tor generated. Read-only.
 verify-onions:

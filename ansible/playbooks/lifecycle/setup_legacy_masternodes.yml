@@ -1,0 +1,207 @@
+---
+# playbooks/lifecycle/setup_legacy_masternodes.yml
+#
+# Builds masternode.conf on the controller wallet, pairing each MN-capable
+# instance with one of the locked collateral outpoints, then optionally starts
+# the masternodes.
+#
+#   make setup-legacy-masternodes                 # write conf, do not start
+#   make setup-legacy-masternodes START=true      # write conf and start them
+#
+# PREREQUISITES
+#   1. make create-collateral COUNT=<n>   — outputs cut and locked
+#   2. collateral tx has nMNCollateralMinConf (15) confirmations
+#   3. make generate-mn-keys, merged into group_vars/all/vault.yml
+#   4. make deploy-pivx                   — masternodeprivkey on each instance
+#
+# WHY LEGACY AND NOT DMN
+# UPGRADE_V6_0 is at height 5000. Before it, special transactions are rejected
+# so ProRegTx cannot be used, and legacy masternodes are the only option. They
+# are also the only option that works at all for IPv6 and Tor nodes:
+#   legacy  CMasternode::IsValidNetAddr             IsReachable && IsRoutable
+#   DMN     CActiveDeterministicMasternodeManager   addrIn.IsIPv4() && ...
+# The DMN validator is IPv4-only with a TODO for IPv6/Tor, which is exactly the
+# migration wall this testnet exists to exercise.
+#
+# ADDRESS RULES
+# masternode.conf enforces the same port rule as the broadcast: the announced
+# port must be 51474 or the whole file fails to parse. Tor instances announce
+# <onion>:51474 (the hidden service maps it to the local bind), IPv6 announces
+# [addr]:51474, IPv4 announces addr:51474.
+
+- name: Collect MN-capable instances
+  hosts: masternodes
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Work out which instances can be masternodes and how they announce
+      ansible.builtin.set_fact:
+        mn_entries: >-
+          {{ pivx_instances
+             | selectattr('enabled', 'equalto', true)
+             | selectattr('role', 'equalto', 'masternode')
+             | map('combine', {'_host': inventory_hostname})
+             | list }}
+
+    - name: Reduce to the ones that can actually announce 51474
+      ansible.builtin.set_fact:
+        mn_capable: >-
+          {{ mn_entries | selectattr('protocol_class', 'equalto', 'tor')
+                        | selectattr('onion_address', 'defined')
+                        | rejectattr('onion_address', 'equalto', '') | list
+             +
+             mn_entries | rejectattr('protocol_class', 'equalto', 'tor')
+                        | selectattr('p2p_port', 'equalto', pivx_p2p_port_base) | list }}
+
+- name: Write masternode.conf on the controller and start
+  hosts: "{{ groups['seeders'][0] }}"
+  become: true
+  gather_facts: false
+
+  vars:
+    controller_instance: >-
+      {{ (pivx_instances | selectattr('role', 'equalto', 'seeder') | list | first).name }}
+    controller_conf: "/etc/pivx/{{ controller_instance }}/pivx.conf"
+    fleet_mns: >-
+      {{ groups['masternodes'] | sort
+         | map('extract', hostvars, 'mn_capable')
+         | select('defined') | list | flatten }}
+
+  tasks:
+    - name: Read the locked collateral outpoints
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ controller_conf }}"
+          - "getmasternodeoutputs"
+      register: outputs_raw
+      changed_when: false
+
+    - name: Parse
+      ansible.builtin.set_fact:
+        collateral: "{{ outputs_raw.stdout | from_json }}"
+
+    - name: Refuse if there is not one collateral per masternode
+      ansible.builtin.assert:
+        that: collateral | length >= fleet_mns | length
+        msg: >-
+          {{ fleet_mns | length }} MN-capable instances but only
+          {{ collateral | length }} collateral outputs.
+          Run: make create-collateral COUNT={{ fleet_mns | length - collateral | length }}
+
+    - name: Refuse if the keys are missing
+      ansible.builtin.assert:
+        that: (vault_mn_legacy_keys | default({})) | length >= fleet_mns | length
+        msg: >-
+          Need {{ fleet_mns | length }} keys in vault_mn_legacy_keys, found
+          {{ (vault_mn_legacy_keys | default({})) | length }}.
+          Run make generate-mn-keys and merge into group_vars/all/vault.yml.
+
+    - name: Check the collateral is mature enough to start
+      # nMNCollateralMinConf is 15. Starting earlier fails the broadcast.
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/opt/pivx/current/bin/pivx-cli -conf={{ controller_conf }}"
+        $C gettransaction {{ (collateral | first).txhash }} | \
+          python3 -c 'import sys,json; print(json.load(sys.stdin)["confirmations"])'
+      args:
+        executable: /bin/bash
+      register: collateral_confs
+      changed_when: false
+
+    - name: Report maturity
+      ansible.builtin.debug:
+        msg: >-
+          collateral has {{ collateral_confs.stdout | trim }} confirmations
+          (need {{ pivx_mn_collateral_minconf | default(15) }} to start)
+
+    - name: Write masternode.conf
+      # Format: alias IP:port masternodeprivkey collateral_txid collateral_index
+      # Outpoints are assigned by fleet order so a rerun maps the same instance
+      # to the same collateral. Do not re-cut collateral between runs or the
+      # pairing shifts and every masternode has to be restarted.
+      ansible.builtin.copy:
+        content: |
+          # Masternode config file — generated by ansible, do not hand-edit.
+          # Format: alias IP:port masternodeprivkey collateral_txid collateral_index
+          #
+          # {{ fleet_mns | length }} legacy masternodes across
+          # {{ groups['masternodes'] | length }} hosts.
+          # Every entry announces port {{ pivx_p2p_port_base }} — masternode.conf
+          # rejects the whole file otherwise.
+          {% for mn in fleet_mns %}
+          {% set c = collateral[loop.index0] %}
+          {% if mn.protocol_class == 'tor' %}
+          {% set addr = mn.onion_address ~ ':' ~ pivx_p2p_port_base %}
+          {% elif mn.protocol_class == 'ipv6' %}
+          {% set addr = '[' ~ mn.external_ip ~ ']:' ~ pivx_p2p_port_base %}
+          {% else %}
+          {% set addr = mn.external_ip ~ ':' ~ pivx_p2p_port_base %}
+          {% endif %}
+          {{ mn.name }} {{ addr }} {{ vault_mn_legacy_keys[mn.name] }} {{ c.txhash }} {{ c.outputidx }}
+          {% endfor %}
+        dest: "{{ pivx_data_dir | default('/var/lib/pivx') }}/{{ controller_instance }}/testnet6/masternode.conf"
+        owner: "{{ pivx_user | default('pivx') }}"
+        group: "{{ pivx_group | default('pivx') }}"
+        mode: "0600"
+      register: mnconf
+
+    - name: Reload the config into the running wallet
+      # masternode.conf is read at startup, so a rewrite needs a restart before
+      # startmasternode can see the new aliases.
+      ansible.builtin.systemd:
+        name: "pivxd@{{ controller_instance }}.service"
+        state: restarted
+      when: mnconf.changed
+
+    - name: Wait for the controller RPC to come back
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ controller_conf }}"
+          - "getblockcount"
+      register: rpc_back
+      until: rpc_back.rc == 0
+      retries: 30
+      delay: 5
+      changed_when: false
+      when: mnconf.changed
+
+    - name: Show what was configured
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ controller_conf }}"
+          - "listmasternodeconf"
+      register: mnconf_list
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          masternode.conf written with {{ fleet_mns | length }} entries.
+          {{ (mnconf_list.stdout | from_json) | length }} parsed by the wallet.
+          {% if not (start_masternodes | default(false) | bool) %}
+          Not started — rerun with START=true once the collateral has
+          {{ pivx_mn_collateral_minconf | default(15) }} confirmations.
+          {% endif %}
+
+    - name: Start the masternodes
+      # lock_wallet=false: the wallet is unencrypted on this testnet, and
+      # passing true makes startmasternode try to relock and fail.
+      ansible.builtin.command:
+        argv:
+          - "/opt/pivx/current/bin/pivx-cli"
+          - "-conf={{ controller_conf }}"
+          - "startmasternode"
+          - "all"
+          - "false"
+      register: start_out
+      changed_when: true
+      when: start_masternodes | default(false) | bool
+
+    - name: Start result
+      ansible.builtin.debug:
+        msg: "{{ start_out.stdout | default('') }}"
+      when: start_masternodes | default(false) | bool
