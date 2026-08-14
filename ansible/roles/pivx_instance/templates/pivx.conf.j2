@@ -27,6 +27,19 @@ testnet=1
 maxconnections={{ 256 if instance.role == 'seeder' else (pivx_maxconnections | default(125)) }}
 printtoconsole={{ pivx_printtoconsole | default(1) }}
 
+# The legacy masternode sync asks peers for the list with `dseg`, and a peer
+# that asks twice is scored +20 ("dseg - peer already asked me for the list").
+# With no masternodes registered yet, CMasternodeSync never completes, so it
+# keeps re-asking and five retries reach the default banscore of 100. The whole
+# fleet banned each other within minutes of leaving IBD — 376 bans across 15
+# hosts — which strands clearnet instances at 0 peers and stops them syncing.
+#
+# Every node here is ours, so scoring them as hostile buys nothing. Raise the
+# threshold well above what the dseg loop can accumulate. Drop this back toward
+# the default once DMNs are registered and the sync actually completes, since
+# real banning is worth having when the network is public.
+banscore={{ pivx_banscore | default(10000) }}
+
 # Sapling zk-SNARK parameters. Kept outside /home because the systemd unit
 # uses ProtectHome=true.
 paramsdir={{ pivx_params_dir }}
@@ -70,9 +83,22 @@ port={{ instance.p2p_port }}
 # Only tor instances get the onion seeds. A clearnet instance has no SOCKS
 # proxy, so dialling an onion fails with "Cannot create socket: unsupported
 # network" on every retry and burns an outbound slot for nothing.
+#
+# A seed must never addnode itself. pivxd dials the address, spots its own
+# nonce in the VERSION handshake, drops the connection, and ThreadOpenAdded-
+# Connections retries it forever. On clearnet that is a cheap loopback connect,
+# but over Tor every retry builds a fresh 3-hop circuit: the three onion seeds
+# were spending ~88% of their CPU in b-pivx-addcon doing exactly this.
 # =============================================================================
+{% if instance.protocol_class == 'tor' %}
+{%   set self_addr = (instance.onion_address | default('')) ~ ':' ~ pivx_p2p_port_base %}
+{% elif instance.protocol_class == 'ipv6' %}
+{%   set self_addr = '[' ~ instance.external_ip ~ ']:' ~ instance.p2p_port %}
+{% else %}
+{%   set self_addr = instance.external_ip ~ ':' ~ instance.p2p_port %}
+{% endif %}
 {% for seed in pivx_seed_nodes | default([]) %}
-{% if '.onion' not in seed or instance.protocol_class == 'tor' %}
+{% if ('.onion' not in seed or instance.protocol_class == 'tor') and seed != self_addr %}
 addnode={{ seed }}
 {% endif %}
 {% endfor %}
@@ -124,11 +150,19 @@ staking=0
 # mn_mode on the instance (or masternode_mode fleet-wide) at the cutover.
 masternode=1
 {% if mn_mode == 'legacy' %}
-{% if instance.mn_legacy_privkey | default('') not in ['', 'REPLACE_ME'] %}
-masternodeprivkey={{ instance.mn_legacy_privkey }}
+{# Key comes from the vault keyed by instance name, so 74 keys do not have to
+   be pasted into host_vars. A per-instance mn_legacy_privkey still wins if set,
+   which keeps one-off overrides possible. Generate with
+   make generate-mn-keys, then merge the result into group_vars/all/vault.yml. #}
+{% set legacy_key = instance.mn_legacy_privkey | default('') %}
+{% if legacy_key in ['', 'REPLACE_ME'] %}
+{%   set legacy_key = (vault_mn_legacy_keys | default({})).get(instance.name, '') %}
+{% endif %}
+{% if legacy_key not in ['', 'REPLACE_ME'] %}
+masternodeprivkey={{ legacy_key }}
 {% else %}
-# masternodeprivkey= not set — generate with `pivx-cli createmasternodekey`
-# and fill mn_legacy_privkey in host_vars
+# masternodeprivkey= not set — run `make generate-mn-keys` and merge the output
+# into group_vars/all/vault.yml as vault_mn_legacy_keys
 {% endif %}
 {% else %}
 {% if instance.bls_operator_key | default('') not in ['', 'REPLACE_ME'] %}
