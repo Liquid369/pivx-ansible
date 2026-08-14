@@ -1,0 +1,87 @@
+---
+# playbooks/ops/reset_addrman.yml
+#
+# Purge cached peer addresses fleet-wide so nodes re-learn each other at the
+# addresses they currently advertise.
+#
+#   make reset-addrman                       # every instance
+#   make reset-addrman COHORT=ipv6           # one cohort
+#
+# WHY THIS KEEPS BEING NEEDED
+# peers.dat survives restarts, so changing what an instance advertises does not
+# heal the network: every peer keeps dialling the old address forever. It has
+# now happened twice —
+#   * Tor  — instances advertised <onion>:<local port> before externalip was
+#            corrected to :51474
+#   * IPv6 — instances sat on 51494/51504 before being moved to 51474 to satisfy
+#            CheckDefaultPort
+# In both cases the symptom is identical and quiet: the node has outbound peers
+# and looks healthy on every metric, while nothing can dial it. Watch
+# pivxd_peers_inbound, not pivxd_peer_count.
+#
+# ORDER MATTERS — MINE FIRST
+# Purging is only half the fix. AdvertiseLocal is gated behind
+# !IsInitialBlockDownload(), so a fleet whose tip is older than nMaxTipAge (24h)
+# never re-advertises and addrman just stays empty after the wipe. Confirm the
+# chain has a recent block and instances report pivxd_ibd == 0 BEFORE running
+# this, otherwise it makes things worse.
+#
+# The three phases run fleet-wide in lockstep (default linear strategy, one task
+# across all hosts before the next), so no surviving node can re-gossip stale
+# addresses into a peer that was just cleaned. Use enough forks: -f 15.
+
+- name: Purge cached peer addresses
+  hosts: all:!explorers
+  gather_facts: false
+
+  vars:
+    pivx_network_subdir: testnet6
+    target_instances: >-
+      {{ pivx_instances | selectattr('enabled', 'equalto', true)
+         | selectattr('cohort', 'equalto', cohort_filter) | list
+         if cohort_filter is defined
+         else pivx_instances | selectattr('enabled', 'equalto', true) | list }}
+
+  tasks:
+    - name: Warn if the fleet is still in IBD
+      # Not fatal — an operator may be deliberately resetting a stalled fleet —
+      # but it is the difference between this fixing the problem and this
+      # emptying addrman with no way to refill it.
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: purging while instances are in initial block download leaves
+          addrman empty until a block is mined. Check the Grafana "In IBD" panel
+          first.
+      run_once: true
+
+    - name: Phase 1 - stop the targeted instances
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: stopped
+      loop: "{{ target_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Phase 2 - drop peers.dat
+      ansible.builtin.file:
+        path: "{{ item.datadir }}/{{ pivx_network_subdir }}/peers.dat"
+        state: absent
+      loop: "{{ target_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Phase 3 - start them again
+      ansible.builtin.systemd:
+        name: "pivxd@{{ item.name }}.service"
+        state: started
+      loop: "{{ target_instances }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Note
+      ansible.builtin.debug:
+        msg: >-
+          {{ target_instances | length }} instances reset on
+          {{ inventory_hostname }}. addrman refills from the addnode seeds and
+          then by gossip; inbound peers take a few minutes to appear.
+      run_once: true
