@@ -25,14 +25,14 @@ lifecycle_phase: bootstrap_mining    # CHANGE as testnet progresses
 # ---------------------------------------------------------------------------
 # Testnet6 has a fresh genesis so official release binaries will not run.
 # We build from the 2026_testnet6 branch until the PR lands upstream.
-pivx_version: "5.6.99-tn6"
+pivx_version: "5.6.99-tn6.2"
 pivx_releases_base: "/opt/pivx/releases"
 pivx_install_dir: "{{ pivx_releases_base }}/{{ pivx_version }}"
 pivx_bin_dir: "{{ pivx_install_dir }}/bin"
 pivx_current_link: "/opt/pivx/current"     # symlink → active release
 pivx_symlink_dir: "/usr/local/bin"          # individual binary symlinks
 pivx_archive_url: "https://github.com/Liquid369/PIVX/releases/download/v{{ pivx_version }}/pivx-{{ pivx_version }}-x86_64-linux-gnu.tar.gz"
-pivx_checksum: "sha256:9c20ff537db0997b047f076e654a16f3de7602541f3448ce936d37a9f0bf16c2"  # 5.6.99-tn6 with genesis fix, spork rotation, miner fix
+pivx_checksum: "sha256:b5c5d0991b2a3a97717d33089ec4065e9c0d9f861fd58c54333fd5bd1e12083c"  # 5.6.99-tn6.2, only checked on the URL path
 
 # ---------------------------------------------------------------------------
 # Sapling parameters
@@ -138,14 +138,18 @@ staking_min_confirmations: 100            # nStakeMinDepth on testnet6
 
 # ---------------------------------------------------------------------------
 # Masternode / quorum settings
-# CONFIRMED against src/consensus/params.h + src/chainparams.cpp:
-#   LLMQ_50_60 = 1  (size 50, minSize 40, threshold 30, DKG every 60 blocks)
-#   LLMQ_400_60 = 2 / LLMQ_400_85 = 3  (impossible with a 60-90 MN fleet)
-#   LLMQ_TEST = 100 (size 3 — regtest-style, only if Testnet6 params add it)
-# llmqTypeChainLocks is LLMQ_50_60 on the 2026_testnet6 branch: size 50,
-# minSize 40, threshold 30. With 60 masternodes that forms, with a margin of
-# 20. Drop below 40 live masternodes and chainlocks stop, which is a useful
-# chaos target but means cohort-stop needs watching.
+# CONFIRMED against src/chainparams.cpp on 2026_testnet6_llmq20:
+#   LLMQ_20_60  (size 20, minSize 16, threshold 12)  <- testnet chainlocks
+#   LLMQ_50_60  (size 50, minSize 40, threshold 30)
+#   LLMQ_400_60 / LLMQ_400_85  (mainnet sizing, impossible on this fleet)
+# llmqTypeChainLocks is LLMQ_20_60 from 5.6.99-tn6.2 onward. The 5.6.99-tn6
+# binary predates it and used LLMQ_50_60, so mixed versions disagree on which
+# quorum signs chainlocks. The whole fleet has to be on one or the other.
+#
+# minSize 16 is what makes cohort isolated DKG testable at all: IPv4 45,
+# IPv6 50 and Tor 50 each clear it on their own, where minSize 40 left IPv4
+# short. Timing measured at size 20 does not extrapolate to mainnet's 400,
+# use it to prove IPv6 and Tor quorums function, not to predict production.
 # ---------------------------------------------------------------------------
 masternode_enabled: false                 # set true per-instance once MN reg is done
 # legacy until UPGRADE_V6_0 (block 5000), deterministic after. Special txs are
