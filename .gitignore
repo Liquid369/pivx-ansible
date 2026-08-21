@@ -1,5 +1,8 @@
 # Secrets and credentials
 *vault.yml
+# ansible-vault backups. Encrypted, but *vault.yml does not match a
+# vault.yml.bak.<stamp> suffix and they would otherwise be committed.
+*vault.yml.bak*
 vault_pass.txt
 *.pem
 *.key
