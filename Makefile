@@ -51,7 +51,7 @@ PLAYBOOK = ANSIBLE_LOCAL_TEMP=.ansible/tmp $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) $
         bootstrap deploy deploy-pivx deploy-monitoring deploy-tor deploy-explorer \
         status check-inventory show-layout wallet-report consolidate \
         upgrade-status prepare-switchover create-collateral verify-onions \
-        start-bootstrap-mining stop-bootstrap-mining \
+        start-bootstrap-mining stop-bootstrap-mining chain-keepalive \
         verify-readiness transition-to-pos \
         enable-staking enable-masternodes \
         wipe-chain wipe-chain-dry-run \
@@ -209,6 +209,13 @@ generate-mn-keys:
 setup-legacy-masternodes:
 	$(PLAYBOOK) ansible/playbooks/lifecycle/setup_legacy_masternodes.yml \
 	  $(if $(START),-e start_masternodes=$(START),)
+
+## Mine one block every 15 min until PoS takes over, so masternode pings
+## keep flowing. KEEPALIVE=off removes it, MAX_HEIGHT=n stops earlier.
+chain-keepalive:
+	$(PLAYBOOK) ansible/playbooks/lifecycle/chain_keepalive.yml \
+	  $(if $(KEEPALIVE),-e keepalive=$(KEEPALIVE),) \
+	  $(if $(MAX_HEIGHT),-e max_height=$(MAX_HEIGHT),)
 
 ## Generate BLS keys and registration worksheets ahead of block 5000.
 prepare-switchover:

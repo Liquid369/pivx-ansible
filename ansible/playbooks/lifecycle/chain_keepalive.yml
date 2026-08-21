@@ -1,0 +1,114 @@
+---
+# playbooks/lifecycle/chain_keepalive.yml
+# Keep the tip fresh with PoW until PoS can take over.
+#
+#   make chain-keepalive                  # install and enable
+#   make chain-keepalive KEEPALIVE=off    # remove the cron, leave the script
+#   make chain-keepalive MAX_HEIGHT=180   # stop mining earlier than 200
+#
+# WHY THIS EXISTS
+# Below UPGRADE_POS (201) nothing produces blocks on its own: gen=0 fleet-wide
+# and staking cannot make a block yet. An idle chain does not just sit there.
+# UpdateBlockchainSynced marks a node unsynced once its tip passes 60 minutes,
+# CActiveMasternode::ManageStatus refuses to send a ping while unsynced, and a
+# masternode that stops pinging goes EXPIRED and then REMOVE. Leaving the chain
+# alone overnight de-registers all 145 and they have to be started again.
+#
+# WHERE IT STOPS
+# Block 201 has to be staked, not mined, so this stops at 200 exactly like
+# pivx_bootstrap_miner does. From 200 onward the chain depends on the seeder
+# wallet staking. That gap is the risky part of the changeover, so the
+# ChainTipStale and PosTransitionStalled alerts cover it rather than this cron.
+
+- name: Install the PoW keepalive on the mining host
+  hosts: "{{ keepalive_host | default('seeders[0]') }}"
+  become: true
+  gather_facts: false
+
+  vars:
+    keepalive_interval_min: 15
+    # mining_phase_target_height is the first PoS block, so PoW stops one short.
+    keepalive_max_height: "{{ max_height | default(mining_phase_target_height | int - 1) }}"
+    keepalive_script: /usr/local/sbin/pivx-chain-keepalive
+
+  tasks:
+    - name: Pick the mining instance on this host
+      ansible.builtin.set_fact:
+        mining_instance: >-
+          {{ (pivx_instances
+              | selectattr('mining_enabled', 'defined')
+              | selectattr('mining_enabled', 'equalto', true)
+              | list | first).name }}
+
+    - name: Install the keepalive script
+      ansible.builtin.copy:
+        dest: "{{ keepalive_script }}"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # Mine one block if the chain still needs PoW. Installed by
+          # playbooks/lifecycle/chain_keepalive.yml — do not hand-edit.
+          set -u
+          CONF="/etc/pivx/{{ mining_instance }}/pivx.conf"
+          CLI="/usr/local/bin/pivx-cli -conf=$CONF"
+          MAX={{ keepalive_max_height }}
+          LOG=/var/log/pivx/chain-keepalive.log
+
+          log() { echo "$(date -Is) $*" >> "$LOG"; }
+
+          H=$($CLI getblockcount 2>/dev/null)
+          if [ -z "$H" ]; then
+            log "rpc down, skipping"
+            exit 0
+          fi
+
+          # Past the PoW window the chain has to stake. Mining here would build
+          # a PoW block at a height where ConnectBlock rejects it as PoW-ended.
+          if [ "$H" -ge "$MAX" ]; then
+            log "height=$H at or past max=$MAX, PoW done, leaving it to staking"
+            exit 0
+          fi
+
+          ADDR=$($CLI getnewaddress keepalive 2>/dev/null)
+          if [ -z "$ADDR" ]; then
+            log "could not get an address, skipping"
+            exit 0
+          fi
+
+          # generatetoaddress blocks until the block is found. The default
+          # client timeout is well under that on a slow block, and the daemon
+          # keeps mining after the client gives up, so a non-zero exit here does
+          # not mean no block was produced. Compare heights instead.
+          $CLI generatetoaddress 1 "$ADDR" >/dev/null 2>&1
+          H2=$($CLI getblockcount 2>/dev/null)
+          log "height $H -> ${H2:-unknown} (max=$MAX)"
+
+    - name: Enable the keepalive cron
+      ansible.builtin.cron:
+        name: "pivx chain keepalive"
+        minute: "*/{{ keepalive_interval_min }}"
+        job: "{{ keepalive_script }}"
+        user: root
+        state: "{{ 'absent' if (keepalive | default('on')) == 'off' else 'present' }}"
+
+    - name: Run it once now so the tip is fresh immediately
+      ansible.builtin.command: "{{ keepalive_script }}"
+      changed_when: true
+      when: (keepalive | default('on')) != 'off'
+
+    - name: Report
+      ansible.builtin.shell: |
+        set -o pipefail
+        C="/usr/local/bin/pivx-cli -conf=/etc/pivx/{{ mining_instance }}/pivx.conf"
+        echo "height=$($C getblockcount)"
+        echo "max_height={{ keepalive_max_height }}"
+        echo "cron={{ 'removed' if (keepalive | default('on')) == 'off' else 'every ' ~ keepalive_interval_min ~ ' min' }}"
+        tail -2 /var/log/pivx/chain-keepalive.log 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      register: ka
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: "{{ ka.stdout_lines }}"
