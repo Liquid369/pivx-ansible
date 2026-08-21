@@ -344,3 +344,113 @@ groups:
         annotations:
           summary: "Alertmanager is down — alerts will not route"
           description: "Alertmanager on {{ monitoring_host }} is not responding."
+
+      # --- Consensus changeover -------------------------------------------
+      # The PoW->PoS handover at {{ mining_phase_target_height }} and the v6
+      # handover at {{ v6_activation_height }} are the two points where the
+      # chain can stop and not restart on its own. Fire on what the node
+      # reports rather than on a height guess, and page loudly at the moment
+      # of transition because both need a human.
+
+      - alert: ChainTipStale
+        # UpdateBlockchainSynced flips a node to unsynced at 3600s, and an
+        # unsynced node stops sending masternode pings, so the whole tier two
+        # expires. Fire well before that so there is time to react.
+        expr: |
+          min(pivxd_tip_age_seconds) > 1800
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Chain tip is {{ '{{' }} $value | humanizeDuration {{ '}}' }} old"
+          description: >
+            No new block fleet-wide. At 3600s every node marks itself unsynced,
+            masternode pings stop and the registrations expire. Below
+            {{ mining_phase_target_height }} check the keepalive cron on the
+            mining host; above it the chain is failing to stake.
+
+      - alert: PowPhaseEnding
+        expr: |
+          max(pivxd_block_height) >= {{ mining_phase_target_height | int - 11 }}
+            and max(pivxd_upgrade_active{upgrade="PoS"}) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Within 10 blocks of the PoS changeover"
+          description: >
+            Height {{ '{{' }} $value {{ '}}' }}. PoW stops at
+            {{ mining_phase_target_height | int - 1 }} and block
+            {{ mining_phase_target_height }} must be staked. Confirm the seeder
+            wallet has stakeablecoins > 0 before it gets there.
+
+      - alert: PosTransitionStalled
+        # The dangerous window: PoW has stopped and nothing has staked yet.
+        expr: |
+          max(pivxd_block_height) >= {{ mining_phase_target_height | int - 1 }}
+            and max(pivxd_upgrade_active{upgrade="PoS"}) == 0
+            and min(pivxd_tip_age_seconds) > 900
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PoW ended, first PoS block has not arrived"
+          description: >
+            The chain is parked at the PoS boundary with a
+            {{ '{{' }} $value | humanizeDuration {{ '}}' }} old tip and nothing
+            is staking. Masternodes expire once the tip passes 3600s. Check
+            staking=1 and stakeablecoins on the seeder wallet.
+
+      - alert: PosActivated
+        expr: |
+          max(pivxd_upgrade_active{upgrade="PoS"}) == 1
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "PoS is active — the chain is staking"
+          description: >
+            UPGRADE_POS reported active by the fleet. PoW is finished and the
+            keepalive cron is no longer doing anything. Confirm blocks keep
+            arriving before standing down.
+
+      - alert: V6ActivationApproaching
+        expr: |
+          max(pivxd_block_height) >= {{ v6_activation_height | int - 50 }}
+            and max(pivxd_upgrade_active{upgrade="v6_evo"}) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Within 50 blocks of v6 activation"
+          description: >
+            Legacy masternodes go obsolete at {{ v6_activation_height }} and
+            special transactions become valid. Any node with a stale evoDB
+            aborts with "Found EvoDB inconsistency, you must reindex". The
+            ProRegTx wave has to be ready to fire.
+
+      - alert: V6Activated
+        expr: |
+          max(pivxd_upgrade_active{upgrade="v6_evo"}) == 1
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "v6 is active — legacy masternodes are now obsolete"
+          description: >
+            Deterministic masternodes only from here. Expect the legacy count
+            to fall to zero; anything not re-registered by ProRegTx is gone.
+
+      - alert: MasternodeCountDropping
+        # Expiry from a stalled chain shows up here first.
+        expr: |
+          max(pivxd_masternode_count{state="enabled"})
+            < max_over_time(pivxd_masternode_count{state="enabled"}[6h]) * 0.9
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Enabled masternodes down >10% from the 6h peak"
+          description: >
+            {{ '{{' }} $value {{ '}}' }} enabled now. A stalled tip stops pings
+            and expires registrations fleet-wide; check ChainTipStale first.

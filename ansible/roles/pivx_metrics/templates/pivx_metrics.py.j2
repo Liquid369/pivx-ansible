@@ -135,6 +135,30 @@ def collect(name, meta):
     add("pivxd_ibd", 1 if chain.get("initial_block_downloading") else 0)
     add("pivxd_tip_fingerprint", fingerprint(chain.get("bestblockhash")))
 
+    # UpdateBlockchainSynced marks a node unsynced once the tip passes 60
+    # minutes, and an unsynced node stops sending masternode pings, so a stalled
+    # chain expires every registration. Nothing produces blocks on its own below
+    # the PoS activation height, so this has to be watched.
+    # getblockchaininfo carries no mediantime on this build, so read the tip.
+    tip_hash = chain.get("bestblockhash")
+    if tip_hash:
+        tip = rpc(conf, "getblock", tip_hash)
+        if isinstance(tip, dict) and isinstance(tip.get("time"), int):
+            add("pivxd_tip_age_seconds", int(time.time()) - tip["time"])
+
+    # Activation state read from the node instead of inferred from height, so
+    # the alert fires on what consensus did rather than on a height guess.
+    # status is "active" or "pending". The activation height goes on a label.
+    ups = chain.get("upgrades")
+    if isinstance(ups, dict):
+        for name, u in ups.items():
+            if not isinstance(u, dict):
+                continue
+            add("pivxd_upgrade_active",
+                1 if u.get("status") == "active" else 0,
+                {"upgrade": name.replace(" ", "_"),
+                 "activation_height": str(u.get("activationheight", ""))})
+
     # Fork detection needs every node to fingerprint the SAME block. Taking it
     # at (own height - depth) does not: nodes one or two blocks apart during
     # normal propagation hash different blocks and look like separate chains,
@@ -219,6 +243,12 @@ def main():
         "# TYPE pivxd_checkpoint_fingerprint gauge",
         "# HELP pivxd_peer_count Connected peers.",
         "# TYPE pivxd_peer_count gauge",
+        "# HELP pivxd_tip_age_seconds Seconds since the tip block's timestamp. "
+        "Past 3600 a node stops sending masternode pings.",
+        "# TYPE pivxd_tip_age_seconds gauge",
+        "# HELP pivxd_upgrade_active 1 when the node reports the upgrade "
+        "active, 0 while pending.",
+        "# TYPE pivxd_upgrade_active gauge",
     ]
     for name, meta in sorted(INSTANCES.items()):
         try:
