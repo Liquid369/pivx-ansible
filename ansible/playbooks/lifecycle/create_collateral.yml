@@ -22,6 +22,7 @@
   vars:
     collateral_amount: 10000
     seed_conf: "/etc/pivx/{{ collateral_instance }}/pivx.conf"
+    lock_helper: /root/.collateral_lock.py
 
   tasks:
     - name: Require a count
@@ -36,12 +37,87 @@
         collateral_instance: >-
           {{ (pivx_instances | selectattr('role', 'equalto', 'seeder') | list | first).name }}
 
+    - name: Stage the collateral lock helper
+      ansible.builtin.copy:
+        dest: "{{ lock_helper }}"
+        mode: "0700"
+        content: |
+          #!/usr/bin/env python3
+          """Lock every masternode collateral output that is not already locked.
+
+          lockunspent validates the whole batch before locking anything and
+          rejects the call if any single outpoint is already locked ("Invalid
+          parameter, output already locked"), so re-sending the full list locks
+          nothing at all. -mnconflock re-locks masternode.conf collateral on
+          every startup, which makes that overlap the normal case rather than an
+          edge case. Send only the difference.
+          """
+          import json
+          import subprocess
+          import sys
+
+          CLI = ["/usr/local/bin/pivx-cli", "-conf=" + sys.argv[1]]
+
+
+          def cli(*args):
+              r = subprocess.run(CLI + list(args), capture_output=True, text=True)
+              if r.returncode != 0:
+                  sys.exit("pivx-cli %s failed: %s" % (args[0], r.stderr.strip()))
+              return json.loads(r.stdout) if r.stdout.strip() else None
+
+
+          def locked():
+              # listlockunspent returns {"transparent": [...]}, not a bare array.
+              got = cli("listlockunspent") or {}
+              return {(o["txid"], o["vout"]) for o in got.get("transparent", [])}
+
+
+          collateral = {(o["txhash"], o["outputidx"])
+                        for o in (cli("getmasternodeoutputs") or [])}
+          missing = sorted(collateral - locked())
+          print("collateral=%d to_lock=%d" % (len(collateral), len(missing)))
+
+          if missing:
+              cli("lockunspent", "false", "true",
+                  json.dumps([{"txid": t, "vout": v} for t, v in missing]))
+
+          # Prove it took. A silent no-op here is what lets a later sendmany
+          # select a collateral as an input and destroy a masternode.
+          still = collateral - locked()
+          if still:
+              sys.exit("ERROR: %d collateral outputs still unlocked" % len(still))
+          print("locked=%d" % len(collateral))
+
+    - name: Lock any collateral that already exists before spending anything
+      # sendmany picks its own inputs, and lockunspent locks live only in
+      # memory. Any restart since the last run leaves earlier collateral
+      # spendable and the next sendmany takes it as input. That is how six
+      # outputs were destroyed during the binary upgrade.
+      ansible.builtin.command: "{{ lock_helper }} {{ seed_conf }}"
+      register: prelock
+      changed_when: "'to_lock=0' not in prelock.stdout"
+
+    - name: Show what the pre-lock did
+      ansible.builtin.debug:
+        msg: "pre-lock: {{ prelock.stdout_lines | join(', ') }}"
+
     - name: Read wallet state
       ansible.builtin.shell: |
         set -o pipefail
         C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
-        echo "balance=$($C getbalance)"
-        echo "existing=$($C getmasternodeoutputs | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))')"
+        # getbalance counts locked coins, which sendmany can never select. Once
+        # the collateral above is locked that overstates the usable balance by
+        # 10000 per masternode, so a wallet with nothing actually spendable
+        # still clears the check below and the sendmany then fails on
+        # insufficient funds. listunspent already excludes locked outputs.
+        $C listunspent | python3 -c '
+        import sys, json
+        print("spendable=%.8f" % sum(x["amount"] for x in json.load(sys.stdin)))
+        '
+        $C getmasternodeoutputs | python3 -c '
+        import sys, json
+        print("existing=%d" % len(json.load(sys.stdin)))
+        '
       args:
         executable: /bin/bash
       register: wallet
@@ -55,9 +131,9 @@
     - name: Show the plan
       ansible.builtin.debug:
         msg: >-
-          {{ collateral_instance }}: balance {{ wal_balance }} PIV,
-          {{ wal_existing }} collateral outputs already present,
-          asking for {{ collateral_count }} more
+          {{ collateral_instance }}: {{ wal_balance }} PIV spendable
+          (locked collateral excluded), {{ wal_existing }} collateral outputs
+          already present, asking for {{ collateral_count }} more
           ({{ collateral_count | int * collateral_amount | int }} PIV)
 
     - name: Refuse if the wallet cannot cover it
@@ -65,8 +141,9 @@
         that: wal_balance | float >= (collateral_count | int * collateral_amount | int) + 1
         msg: >-
           Need {{ collateral_count | int * collateral_amount | int }} PIV plus fee,
-          wallet has {{ wal_balance }}. Mine more blocks or wait for coinbase
-          maturity (15 confirmations).
+          only {{ wal_balance }} is spendable. The {{ wal_existing }} locked
+          collateral outputs do not count toward this. Mine more blocks or wait
+          for the rewards to mature.
 
     - name: Stop here on a dry run
       ansible.builtin.meta: end_play
@@ -109,19 +186,16 @@
       changed_when: false
 
     - name: Lock them so staking and sweeps cannot spend them
-      ansible.builtin.shell: |
-        set -o pipefail
-        C="/usr/local/bin/pivx-cli -conf={{ seed_conf }}"
-        LOCKS=$(echo '{{ outputs_raw.stdout }}' | python3 -c '
-        import sys, json
-        outs = json.load(sys.stdin)
-        print(json.dumps([{"txid": o["txhash"], "vout": o["outputidx"]} for o in outs]))
-        ')
-        $C lockunspent false true "$LOCKS"
-      args:
-        executable: /bin/bash
+      # Same helper as the pre-lock: it re-reads the wallet and locks only what
+      # is not locked yet. Passing the full list here is what used to fail, as
+      # the outputs locked before the sendmany are still locked now.
+      ansible.builtin.command: "{{ lock_helper }} {{ seed_conf }}"
       register: lock_out
-      changed_when: true
+      changed_when: "'to_lock=0' not in lock_out.stdout"
+
+    - name: Show what was locked
+      ansible.builtin.debug:
+        msg: "lock: {{ lock_out.stdout_lines | join(', ') }}"
 
     # switchover/ is gitignored (.gitignore:51) — the worksheet is working state
     # that must never be committed. copy: does not create the parent, so make it
