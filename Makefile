@@ -212,10 +212,13 @@ setup-legacy-masternodes:
 
 ## Mine one block every 15 min until PoS takes over, so masternode pings
 ## keep flowing. KEEPALIVE=off removes it, MAX_HEIGHT=n stops earlier.
+## INTERVAL=n sets the cron gap in minutes; keep it under 45, the ping cutoff
+## is 60 and a slow block eats into the margin.
 chain-keepalive:
 	$(PLAYBOOK) ansible/playbooks/lifecycle/chain_keepalive.yml \
 	  $(if $(KEEPALIVE),-e keepalive=$(KEEPALIVE),) \
-	  $(if $(MAX_HEIGHT),-e max_height=$(MAX_HEIGHT),)
+	  $(if $(MAX_HEIGHT),-e max_height=$(MAX_HEIGHT),) \
+	  $(if $(INTERVAL),-e keepalive_interval_min=$(INTERVAL),)
 
 ## Generate BLS keys and registration worksheets ahead of block 5000.
 prepare-switchover:

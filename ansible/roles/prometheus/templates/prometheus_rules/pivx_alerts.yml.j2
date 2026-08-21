@@ -356,8 +356,14 @@ groups:
         # UpdateBlockchainSynced flips a node to unsynced at 3600s, and an
         # unsynced node stops sending masternode pings, so the whole tier two
         # expires. Fire well before that so there is time to react.
+        #
+        # 2400 sits between the keepalive cadence and the cutoff. The cron is
+        # capped at 45 minutes for the same reason: at a 30 minute gap the tip
+        # already reaches 1800s every cycle before the next block lands, and an
+        # alert that fires on every normal cycle gets ignored by the time it
+        # means something.
         expr: |
-          min(pivxd_tip_age_seconds) > 1800
+          min(pivxd_tip_age_seconds) > 2400
         for: 5m
         labels:
           severity: critical
