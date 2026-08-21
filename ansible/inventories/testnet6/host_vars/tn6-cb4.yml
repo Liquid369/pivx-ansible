@@ -48,7 +48,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-v4-mn01"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -90,7 +90,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-v6-mn03"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -111,7 +111,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-v6-mn04"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -134,7 +134,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn05"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -157,7 +157,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn06"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -180,7 +180,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn11"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -203,7 +203,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn12"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -226,7 +226,7 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn13"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
 
@@ -249,6 +249,6 @@ pivx_instances:
     confdir: "/etc/pivx/tn6-cb4-tor-mn14"
     mining_enabled: false
     staking_enabled: false       # set true in Phase 3 once coins arrive
-    masternode_enabled: false    # set true in Phase 4 after DMN registration
+    masternode_enabled: true     # legacy MN, key from vault_mn_legacy_keys
     bls_operator_key: "REPLACE_ME"
     extra_conf: []
