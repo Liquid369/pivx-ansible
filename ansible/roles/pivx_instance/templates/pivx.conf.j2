@@ -160,6 +160,17 @@ masternode=1
 {% endif %}
 {% if legacy_key not in ['', 'REPLACE_ME'] %}
 masternodeprivkey={{ legacy_key }}
+{# initMasternode (activemasternode.cpp:253) refuses to start with an empty
+   masternodeaddr, and pivxd exits 1 rather than running without it, so the
+   instance crash loops. It must match what masternode.conf announces, and it
+   must be the network default port for CheckDefaultPort. #}
+{% if instance.protocol_class == 'tor' %}
+masternodeaddr={{ instance.onion_address }}:{{ pivx_p2p_port_base }}
+{% elif instance.protocol_class == 'ipv6' %}
+masternodeaddr=[{{ instance.external_ip }}]:{{ pivx_p2p_port_base }}
+{% else %}
+masternodeaddr={{ instance.external_ip }}:{{ pivx_p2p_port_base }}
+{% endif %}
 {% else %}
 # masternodeprivkey= not set — run `make generate-mn-keys` and merge the output
 # into group_vars/all/vault.yml as vault_mn_legacy_keys
