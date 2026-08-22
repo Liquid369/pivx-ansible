@@ -16,10 +16,24 @@
     group: root
     mode: "0755"
 
-- name: Check if testnet pivxd already installed
+# Keyed on the tarball checksum, not on the binary merely existing. Guarding on
+# existence meant the explorer kept whatever binary it was first given: the
+# fleet moved to 5.6.99-tn6.2 and this box stayed on the old dirty build, which
+# has no PoS activation at 201 in its chainparams. It rejected every block the
+# fleet staked with "CheckWork : incorrect proof of work at 201" and sat at 200
+# while a successful looking deploy reported changed.
+- name: Read the checksum of the staged tarball
   ansible.builtin.stat:
-    path: "{{ explorer_pivx_install_dir }}/bin/pivxd"
-  register: tn_pivxd
+    path: "/tmp/pivx-{{ pivx_version }}.tar.gz"
+    checksum_algorithm: sha256
+  register: tn_tarball_stat
+
+- name: Read the checksum of whatever is installed
+  ansible.builtin.slurp:
+    src: "{{ explorer_pivx_install_dir }}/.binary-sha256"
+  register: tn_installed_sha
+  failed_when: false
+  changed_when: false
 
 - name: Extract testnet PIVX binary (pre-staged tarball)
   ansible.builtin.unarchive:
@@ -30,7 +44,17 @@
       - "--strip-components=2"
       - "--wildcards"
       - "*/bin/*"
-  when: not tn_pivxd.stat.exists
+  when: >-
+    tn_tarball_stat.stat.checksum | default('')
+    != (tn_installed_sha.content | default('') | b64decode | trim)
+  notify: restart testnet pivxd
+
+- name: Record which binary is installed
+  ansible.builtin.copy:
+    content: "{{ tn_tarball_stat.stat.checksum }}\n"
+    dest: "{{ explorer_pivx_install_dir }}/.binary-sha256"
+    mode: "0644"
+  when: tn_tarball_stat.stat.checksum is defined
 
 - name: Create testnet data directory
   ansible.builtin.file:
