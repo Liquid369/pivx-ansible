@@ -151,7 +151,20 @@ groups:
         # block are compared. Without the grouping this fires constantly:
         # nodes a block or two apart during propagation hash different blocks
         # and every propagation looks like a fork.
-        expr: max(count by (checkpoint_height) (count_values("fp", pivxd_checkpoint_fingerprint))) > 1
+        #
+        # count_values is an aggregation operator and needs its own by clause.
+        # Without one it collapses every input series and drops
+        # checkpoint_height, so the outer count groups on a label that is no
+        # longer there and compares fingerprints taken at different heights.
+        # That reported a fork on a fleet agreeing on every block: at 15s PoS
+        # spacing nodes straddle a stride boundary constantly, so two
+        # legitimate checkpoint heights are always in flight.
+        expr: |
+          max(
+            count by (checkpoint_height) (
+              count_values by (checkpoint_height) ("fp", pivxd_checkpoint_fingerprint)
+            )
+          ) > 1
         for: 5m
         labels:
           severity: critical
@@ -357,13 +370,13 @@ groups:
         # unsynced node stops sending masternode pings, so the whole tier two
         # expires. Fire well before that so there is time to react.
         #
-        # 2400 sits between the keepalive cadence and the cutoff. The cron is
-        # capped at 45 minutes for the same reason: at a 30 minute gap the tip
-        # already reaches 1800s every cycle before the next block lands, and an
-        # alert that fires on every normal cycle gets ignored by the time it
-        # means something.
+        # Staking settled at a steady 15s spacing once PoS activated, so 300s
+        # is already 20 missed blocks and means the stakers have stopped, not
+        # that one block ran late. The old 2400 was sized for the keepalive
+        # cadence during PoW and would have let the chain sit dead for 160
+        # blocks before firing.
         expr: |
-          min(pivxd_tip_age_seconds) > 2400
+          min(pivxd_tip_age_seconds) > 300
         for: 5m
         labels:
           severity: critical
@@ -419,6 +432,25 @@ groups:
             UPGRADE_POS reported active by the fleet. PoW is finished and the
             keepalive cron is no longer doing anything. Confirm blocks keep
             arriving before standing down.
+
+      - alert: UpgradeActivated
+        # One rule instead of thirteen. The upgrade label says which one, so
+        # the notification names itself. Fires on the edge: active now, pending
+        # 15 minutes ago. At 15s spacing that window is 60 blocks, wide enough
+        # that a scrape gap cannot hide the transition and narrow enough that
+        # it stops firing afterwards.
+        expr: |
+          max by (upgrade, activation_height) (pivxd_upgrade_active) == 1
+            and max by (upgrade, activation_height) (pivxd_upgrade_active offset 15m) == 0
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ '{{' }} $labels.upgrade {{ '}}' }} activated at height {{ '{{' }} $labels.activation_height {{ '}}' }}"
+          description: >
+            The staged activations between PoS and v6 are consensus only and
+            need no action. Worth watching ChainForkDetected and the masternode
+            count for a few minutes after each one in case a node disagrees.
 
       - alert: V6ActivationApproaching
         expr: |

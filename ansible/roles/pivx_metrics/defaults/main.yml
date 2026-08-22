@@ -21,4 +21,10 @@ pivx_metrics_checkpoint_depth: 10
 # Checkpoint heights are snapped to a multiple of this. Without it each node
 # fingerprints its own tip minus depth, so nodes a block apart compare
 # different blocks and register as a fork.
-pivx_metrics_checkpoint_stride: 10
+#
+# 100 rather than 10 because PoS settled at 15s spacing: at a stride of 10 the
+# fleet crosses a boundary every 150s and is almost always split across two
+# checkpoint heights, which leaves each comparison group too small to say much.
+# At 100 a boundary comes every ~25 minutes and the whole fleet sits in one
+# group between them.
+pivx_metrics_checkpoint_stride: 100
