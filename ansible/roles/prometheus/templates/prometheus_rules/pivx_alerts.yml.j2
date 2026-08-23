@@ -193,20 +193,36 @@ groups:
         # MN-capable instances only: v4-mn02 and the observer legitimately have
         # no inbound and would otherwise fire forever.
         #
-        # Note some zero-inbound is structural, not a fault. Only one outbound
-        # per netgroup is permitted (net.cpp:1807), and this fleet has ~14
-        # netgroups for 115 masternodes, so instances that lose their group's
-        # slot get none. 30m is deliberately long to ride that out.
-        expr: pivxd_peers_inbound == 0 and on(pivx_instance) pivxd_up{mn_capable="1"} == 1
+        # Measured per cohort as a share rather than per instance. Only one
+        # outbound per netgroup is permitted (net.cpp:1807) and the 45 IPv4
+        # addresses sit in 10 netgroups, 18 of them in 51.161.0.0/16 alone, so
+        # inside a crowded group one instance takes the slot and the others get
+        # no inbound however reachable they are. The six firing this way all
+        # answered a TCP connect from outside their own netgroup, so the
+        # per-instance form was reporting correct topology as a fault, and an
+        # alert that is always on is one nobody reads.
+        #
+        # A cohort losing reachability outright is the case worth paging on,
+        # which is what happened to Tor, and it shows up as most of a cohort at
+        # once: 6 of 45 IPv4 is the netgroup limit, 50 of 50 Tor was a fault.
+        expr: |
+          (
+            count by (cohort) (
+              pivxd_peers_inbound == 0 and on(pivx_instance) pivxd_up{mn_capable="1"} == 1
+            )
+            /
+            count by (cohort) (pivxd_up{mn_capable="1"} == 1)
+          ) > 0.5
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "No inbound peers on {{ '{{' }} $labels.pivx_instance {{ '}}' }}"
+          summary: "{{ '{{' }} $labels.cohort {{ '}}' }} cohort is mostly unreachable"
           description: >
-            {{ '{{' }} $labels.pivx_instance {{ '}}' }} has outbound peers but
-            zero inbound for 30m — its advertised address is probably
-            unreachable, which disqualifies it as a masternode.
+            Over half the MN-capable {{ '{{' }} $labels.cohort {{ '}}' }}
+            instances have had zero inbound for 30m. A few is the netgroup limit
+            and expected; a cohort-wide figure means the advertised address, port
+            or hidden service is broken for that whole class.
 
       - alert: PivxStuckInIBD
         expr: pivxd_ibd == 1
