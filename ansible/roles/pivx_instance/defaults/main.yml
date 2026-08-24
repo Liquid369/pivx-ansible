@@ -34,13 +34,25 @@ lifecycle_phase: bootstrap_mining
 # Valid categories per src/logging.cpp — there is no "mnauth" category.
 # Useful for quorum testing: masternode, llmq, dkg, chainlocks, net_mn, net,
 # staking, tor. Reduce/expand as needed during different test phases.
+#
+# net and net_mn are deliberately not here. Both trace individual P2P messages
+# rather than events, and at 145 masternodes gossiping pings across ~28 peers
+# each that is overwhelming: 2071 lines a minute per instance and 55GB across
+# the fleet, which buried the categories below in Loki. Dropping net took it to
+# ~857, dropping net_mn as well to 34, and what remains is readable.
+#
+# The four kept are event level. They are also the ones v6 needs: dkg and llmq
+# for quorum formation, chainlocks for signing, masternode for the ProRegTx
+# wave and the legacy nodes going obsolete at 5000.
+#
+# Turn either back on for a specific investigation without a restart or a
+# redeploy, the way the Tor dial loop and the addrman port poisoning needed:
+#   pivx-cli -conf=<conf> logging '["net_mn"]' '[]'
 pivx_debug_categories:
   - masternode
   - llmq
   - dkg
   - chainlocks
-  - net_mn
-  - net
 
 # Maximum connections default
 pivx_maxconnections: 125
