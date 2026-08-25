@@ -164,7 +164,8 @@ make verify-readiness                   # detailed phase readiness poll
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/QUICKSTART.md](docs/QUICKSTART.md) | **Start here** — end-to-end operator guide |
+| [docs/TEAM_RUNBOOK.md](docs/TEAM_RUNBOOK.md) | **New operators start here** — access, safety rules, workflows, known traps |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | End-to-end operator guide, first-time setup |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | Full lifecycle phase reference |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full system design and rationale |
 | [docs/INVENTORY_MODEL.md](docs/INVENTORY_MODEL.md) | Host/instance schema reference |
