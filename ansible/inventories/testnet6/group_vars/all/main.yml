@@ -80,6 +80,8 @@ pivx_rpc_port_base: 51478       # testnet rpc default
 ops_ssh_keys:
   - name: luke
     key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILZflFbb+iN4cUh4SwwABoMs95fz+TJ4a0atBytMtgig luke@lukehanslarsen.com"
+  - name: duddino
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIYfvmkS+g0SMc0qx8bjrqzMqvZuFMQmGBgx9/dyHWry duddino@duddino-arch"
 
 # ---------------------------------------------------------------------------
 # Systemd
