@@ -49,6 +49,19 @@ paramsdir={{ pivx_params_dir }}
 listen=1
 bind={{ instance.bind_addr }}
 externalip={{ instance.external_ip }}
+{% if pivx_clearnet_onion_reach | default(false) %}
+# net_processing.cpp "Do not store addresses outside our network" drops any
+# address whose network IsReachable() says no, and init.cpp defaults NET_ONION
+# to unreachable. Without this a clearnet node discards every onion address it
+# is sent, so it never learns the Tor masternodes, never relays them, and never
+# serves them from getaddr. Measured: clearnet instances held 0 onion addresses
+# out of ~145 on the network.
+#
+# -onion, not -proxy. -proxy calls SetProxy for NET_IPV4 and NET_IPV6 as well,
+# which would push this node's clearnet traffic through Tor. -onion sets the
+# proxy for onion only and leaves IPv4 direct, which is the whole point here.
+onion=127.0.0.1:{{ tor_socks_port | default(9050) }}
+{% endif %}
 {% elif instance.protocol_class == 'ipv6' %}
 # --- IPv6 mode ---
 listen=1
