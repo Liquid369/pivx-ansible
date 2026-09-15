@@ -6,8 +6,15 @@
 #   make prepare-switchover
 #
 # Nothing here touches the chain or the running nodes. It only collects the
-# keys and the facts a ProRegTx needs, because at 5000 legacy masternodes stop
-# counting and there is no way to pre-submit the registrations.
+# keys and the facts a ProRegTx needs, and there is no way to pre-submit the
+# registrations.
+#
+# The old header said legacy masternodes stop counting at 5000. They do not.
+# CountEnabled (masternodeman.cpp:429-447) sums the legacy and deterministic
+# lists with no dedup, and CheckAndRemove never evicts a legacy entry shadowed
+# by a DMN despite a comment claiming it does. What actually ends the legacy
+# path is SPORK_21_LEGACY_MNS_MAX_HEIGHT, which defaults to 4070908800 and is
+# OFF (spork.cpp:24). UPGRADE_V6_0 at height 5000 only enables ProRegTx.
 
 - name: Prepare v6 switchover
   hosts: masternodes
@@ -60,8 +67,23 @@
           # protx_register "collateralHash" collateralIndex "ipAndPort" \
           #     "ownerAddress" "operatorPubKey" "votingAddress" "payoutAddress"
           #
-          # Collateral is whatever 10000 PIV output already backs the legacy
-          # masternode. It is reused as is, no need to move it.
+          # Collateral MUST be a fresh 10000 PIV output that backs no legacy
+          # masternode. Do not reuse the legacy collateral.
+          #
+          # Reusing it shadows the legacy entry: budgetmanager.cpp:1108-1135 and
+          # masternode-payments.cpp:467-495 consult GetMNByCollateral first and
+          # return inside the hit, so the legacy branch is unreachable for that
+          # outpoint and the signature is then checked against keyIDVoting
+          # rather than pubKeyMasternode. A node still signing as legacy gets
+          # DoS(100, "bad-mvote-sig"), which is a ban. CheckProRegTx does not
+          # check the collateral against mapMasternodes, so nothing stops this.
+          #
+          # It also double counts. 145 legacy re-registering on reused
+          # collateral reads as 290 through CountEnabled, moving the budget
+          # threshold from 14 to 29.
+          #
+          # voting_addr is in the fill-ins because protx_register takes it and
+          # this worksheet used to omit it.
           {% for r in mn_rows | default([]) %}
 
           [{{ r.instance }}]
@@ -71,6 +93,7 @@
           bls_secret  = {{ r.bls_secret }}
           collateral  = FILL IN txid:index
           owner_addr  = FILL IN
+          voting_addr = FILL IN
           payout_addr = FILL IN
           {% endfor %}
         dest: "{{ playbook_dir }}/../../../switchover/{{ inventory_hostname }}.txt"
