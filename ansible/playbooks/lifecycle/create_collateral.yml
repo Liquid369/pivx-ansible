@@ -215,8 +215,22 @@
           # host {{ inventory_hostname }} wallet {{ collateral_instance }}
           # funding tx {{ sendmany_out.stdout | trim }}
           #
-          # These are locked in the wallet. They back the legacy masternodes now
-          # and are reused as ProRegTx collateral at v6, no move needed.
+          # These are locked in the wallet and back the legacy masternodes.
+          #
+          # DO NOT reuse one of these as ProRegTx collateral while the legacy
+          # masternode on it is still running. An earlier version of this header
+          # said they could be reused as is, which is wrong and would get nodes
+          # banned: a DMN on the same outpoint shadows the legacy entry, because
+          # budgetmanager and masternode-payments consult GetMNByCollateral first
+          # and return inside the hit, so the signature is checked against
+          # keyIDVoting instead of pubKeyMasternode and a node still signing as
+          # legacy takes DoS(100, "bad-mvote-sig"). CheckProRegTx does not
+          # compare the collateral against mapMasternodes, so nothing rejects it.
+          # It also double counts through CountEnabled, which sums both lists.
+          # See prepare_v6_switchover.yml for the full reasoning.
+          #
+          # Cut fresh outputs for the ProRegTx wave, or retire the legacy
+          # masternode on an outpoint before reusing it.
           #
           # protx_register "<txhash>" <outputidx> "<ip:port>" "<owner>" \
           #     "<blsPublic>" "<voting>" "<payout>"
