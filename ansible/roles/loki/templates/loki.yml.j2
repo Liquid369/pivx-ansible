@@ -38,6 +38,14 @@ schema_config:
 
 compactor:
   working_directory: /var/lib/loki/compactor
+  # 2.9 will not run the compactor without shared_store, and it says nothing
+  # about it: retention_enabled is accepted, Loki starts clean, and the
+  # compactor simply never logs or runs. Retention had been off since this host
+  # was built, which is how /var/lib/loki reached 221GB on a 290GB disk shared
+  # with Prometheus, Grafana and 9 masternodes. It must match object_store in
+  # schema_config.
+  shared_store: filesystem
+  compaction_interval: 10m
   retention_enabled: true
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
