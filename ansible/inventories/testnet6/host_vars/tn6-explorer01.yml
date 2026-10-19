@@ -28,7 +28,14 @@ explorer_rustyblox_binary: /opt/rustyblox-testnet/bin/rustyblox
 explorer_rustyblox_frontend_dist: /opt/rustyblox-testnet/frontend/dist
 # Where the explorer source is built on the box. The play copies the binary
 # and frontend out of here; it does not build or check out anything itself.
-explorer_rustyblox_source_dir: /root/rusty-blox
+#
+# Not /root/rusty-blox: that tree hard-codes mainnet magic, address prefixes,
+# genesis and emission, so its binary indexes zero testnet blocks while
+# reporting inSync. /root/rusty-blox-tn6 is a detached worktree at e689334
+# (master with #170 merged, plus #171) with binary and frontend built. Move to
+# a master checkout once #171 merges; /root/rusty-blox tracks the mainnet
+# instance's branch, so update it only when mainnet takes the change.
+explorer_rustyblox_source_dir: /root/rusty-blox-tn6
 
 # The chain starts empty, so serve as soon as there is a block instead of
 # waiting for the 1000-block mainnet default.

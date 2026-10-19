@@ -14,6 +14,10 @@ WorkingDirectory={{ explorer_rustyblox_workdir }}
 ExecStart={{ explorer_rustyblox_binary }}
 Environment=HOME=/root
 Environment=RUST_LOG=info
+# Selects testnet6 magic, address prefixes, genesis, emission and budget cycle
+# (rusty-blox #170). Unset, it parses for mainnet: zero blocks indexed while
+# still reporting inSync.
+Environment=RUSTYBLOX_NETWORK=testnet6
 LimitNOFILE=65536
 Restart=on-failure
 RestartSec=10
