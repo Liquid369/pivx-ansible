@@ -1,0 +1,23 @@
+[Unit]
+Description=rusty-blox testnet6 governance vote log sidecar
+Documentation=https://github.com/Liquid369/rusty-blox
+After=network-online.target pivxd-testnet.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# pivxd-testnet runs as root and its debug.log is 0600 root.
+User=root
+Group=root
+ExecStart={{ explorer_rustyblox_workdir }}/bin/rustyblox-govlog run \
+  --log {{ explorer_pivx_datadir }}/testnet6/debug.log \
+  --db {{ explorer_govlog_db }}
+Environment=RUST_LOG=info
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rustyblox-govlog-testnet
+
+[Install]
+WantedBy=multi-user.target

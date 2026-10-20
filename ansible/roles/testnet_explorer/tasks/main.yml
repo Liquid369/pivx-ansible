@@ -129,6 +129,14 @@
     mode: "0755"
   notify: restart testnet rustyblox
 
+- name: Install the testnet govlog sidecar binary
+  ansible.builtin.copy:
+    src: "{{ explorer_rustyblox_source_dir }}/target/release/rustyblox-govlog"
+    dest: "{{ explorer_rustyblox_workdir }}/bin/rustyblox-govlog"
+    remote_src: true
+    mode: "0755"
+  notify: restart testnet govlog
+
 - name: Install the testnet frontend
   ansible.posix.synchronize:
     src: "{{ explorer_rustyblox_source_dir }}/frontend/dist/"
@@ -160,6 +168,27 @@
 - name: Enable and start rusty-blox testnet
   ansible.builtin.systemd:
     name: rustyblox-testnet
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# Budget-vote log sidecar. Runs as root because pivxd-testnet does and its
+# debug.log is 0600 root. The explorer reads the store as a secondary, so
+# start order between the two does not matter.
+- name: Install rusty-blox testnet govlog systemd unit
+  ansible.builtin.template:
+    src: rustyblox-govlog-testnet.service.j2
+    dest: /etc/systemd/system/rustyblox-govlog-testnet.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart testnet govlog
+
+- name: Enable and start the testnet govlog sidecar
+  ansible.builtin.systemd:
+    name: rustyblox-govlog-testnet
     state: started
     enabled: true
     daemon_reload: true

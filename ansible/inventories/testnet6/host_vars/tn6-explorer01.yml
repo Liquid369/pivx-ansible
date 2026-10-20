@@ -41,6 +41,9 @@ explorer_rustyblox_source_dir: /root/rusty-blox-tn6
 explorer_rustyblox_min_blocks: 1
 explorer_rustyblox_db_dir: /opt/coins/data/pivx-testnet/rustyblox
 explorer_rustyblox_port: 3006
+# rustyblox-govlog store. Not rebuildable from the chain: it holds vote lines
+# pivxd logged, and debug.log does not keep them. Keep it out of any resync.
+explorer_govlog_db: /opt/coins/data/pivx-testnet/rustyblox/govlog.db
 explorer_domain: testnet-explorer.liquid369.wtf
 
 # Existing cloudflared tunnel on the box (found during recon).

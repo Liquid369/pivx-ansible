@@ -15,6 +15,11 @@
     name: rustyblox-testnet
     state: restarted
 
+- name: restart testnet govlog
+  ansible.builtin.systemd:
+    name: rustyblox-govlog-testnet
+    state: restarted
+
 - name: restart cloudflared
   ansible.builtin.systemd:
     name: cloudflared

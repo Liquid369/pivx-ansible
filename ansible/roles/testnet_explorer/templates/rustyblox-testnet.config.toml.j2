@@ -54,5 +54,10 @@ port = {{ explorer_rustyblox_port }}
 worker_threads = "2"
 ws_allowed_origins = "https://{{ explorer_domain }}"
 
+[governance]
+# Written by rustyblox-govlog-testnet, opened here read-only as a RocksDB
+# secondary. Enables /api/v2/govlog and the Vote Log tab.
+govlog_db_path = "{{ explorer_govlog_db }}"
+
 [repair]
 reresolve_heightless = false

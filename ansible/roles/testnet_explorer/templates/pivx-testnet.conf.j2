@@ -19,6 +19,11 @@ paramsdir={{ explorer_pivx_params_dir }}
 addnode={{ seed }}
 {% endfor %}
 
+# rustyblox-govlog tails debug.log for accepted and rejected budget votes;
+# without mnbudget those lines are never written. Cost: ~2 lines per
+# proposal every 5 min of "Cleaning proposal votes" noise.
+debug=mnbudget
+
 # Explorer is an observer: no mining, staking, or masternode.
 gen=0
 staking=0
