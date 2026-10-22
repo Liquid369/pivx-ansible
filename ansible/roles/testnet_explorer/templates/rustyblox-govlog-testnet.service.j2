@@ -11,7 +11,8 @@ User=root
 Group=root
 ExecStart={{ explorer_rustyblox_workdir }}/bin/rustyblox-govlog run \
   --log {{ explorer_pivx_datadir }}/testnet6/debug.log \
-  --db {{ explorer_govlog_db }}
+  --db {{ explorer_govlog_db }} \
+  --p2p 127.0.0.1:{{ explorer_pivx_p2p_port }}
 Environment=RUST_LOG=info
 Restart=always
 RestartSec=5
